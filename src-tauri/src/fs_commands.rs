@@ -244,6 +244,32 @@ pub async fn export_save(
     }
 }
 
+/// From a process's argv, return the first argument that is a document to open:
+/// one that already exists OR has a recognized doc extension (scripta/tex/md).
+/// The program name (argv[0]) and flags (starting with '-') are ignored.
+pub fn launch_file_from_args(args: &[String]) -> Option<String> {
+    args.iter()
+        .skip(1)
+        .find(|a| {
+            if a.starts_with('-') {
+                return false;
+            }
+            let p = Path::new(a);
+            p.is_file() || has_doc_ext(p)
+        })
+        .cloned()
+}
+
+/// The file path requested at launch (from argv), pulled once by the frontend.
+#[derive(Default)]
+pub struct LaunchFile(pub Mutex<Option<String>>);
+
+#[tauri::command]
+pub fn take_launch_file(state: tauri::State<'_, LaunchFile>) -> Result<Option<String>, String> {
+    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(guard.take())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -344,5 +370,40 @@ mod tests {
         fs::write(root.join("a.scripta"), "x").unwrap();
         delete_impl(root, "a.scripta").unwrap();
         assert!(!root.join("a.scripta").exists());
+    }
+
+    #[test]
+    fn launch_file_picks_existing_doc_path() {
+        let dir = tempdir().unwrap();
+        let f = dir.path().join("a.scripta");
+        fs::write(&f, "x").unwrap();
+        let prog = "/Applications/App.app/Contents/MacOS/app".to_string();
+        let args = vec![prog, f.to_string_lossy().to_string()];
+        assert_eq!(launch_file_from_args(&args), Some(f.to_string_lossy().to_string()));
+    }
+
+    #[test]
+    fn launch_file_none_when_only_program() {
+        let args = vec!["/path/to/app".to_string()];
+        assert_eq!(launch_file_from_args(&args), None);
+    }
+
+    #[test]
+    fn launch_file_ignores_flags_and_nondoc() {
+        let args = vec![
+            "/path/to/app".to_string(),
+            "-psn_0_12345".to_string(),
+            "notes.txt".to_string(),
+        ];
+        assert_eq!(launch_file_from_args(&args), None);
+    }
+
+    #[test]
+    fn launch_file_accepts_doc_extension_even_if_missing() {
+        let args = vec!["/path/to/app".to_string(), "/tmp/x/ghost.scripta".to_string()];
+        assert_eq!(
+            launch_file_from_args(&args),
+            Some("/tmp/x/ghost.scripta".to_string())
+        );
     }
 }
