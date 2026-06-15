@@ -147,7 +147,14 @@ nodeView : Set String -> Node -> Html Msg
 nodeView openFolders node =
     case node of
         FileNode r ->
-            li [ onClick (ClickedTreeNode r.path), style "cursor" "pointer" ] [ text r.name ]
+            li
+                [ onClick (ClickedTreeNode r.path)
+                , style "cursor" "pointer"
+                , style "margin-bottom" "4px"
+                , style "padding-left" "2em"
+                , style "text-indent" "-2em"
+                ]
+                [ text r.name ]
 
         FolderNode r ->
             let
@@ -156,7 +163,12 @@ nodeView openFolders node =
             in
             li []
                 (div
-                    [ onClick (ToggledFolder r.path), style "cursor" "pointer" ]
+                    [ onClick (ToggledFolder r.path)
+                    , style "cursor" "pointer"
+                    , style "margin-bottom" "4px"
+                    , style "padding-left" "2em"
+                    , style "text-indent" "-2em"
+                    ]
                     [ folderIcon isOpen, text r.name ]
                     :: (if isOpen then
                             [ treeView openFolders r.children ]
