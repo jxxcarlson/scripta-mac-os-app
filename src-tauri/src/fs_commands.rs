@@ -209,6 +209,41 @@ pub async fn pick_workspace(app: tauri::AppHandle) -> Result<Option<String>, Str
     Ok(chosen.map(|p| p.to_string()))
 }
 
+/// Opens a native Save dialog pre-populated with `default_name`, writes `content` to the
+/// chosen path, and returns the absolute path as a UTF-8 string, or `None` if the user
+/// cancels.
+///
+/// Save-dialog API used: `app.dialog().file().set_file_name(&default_name).blocking_save_file()`
+/// (from `tauri_plugin_dialog` v2, `DialogExt` trait).
+///
+/// Path conversion: `FilePath::into_path()` (returns `Result<PathBuf, tauri_plugin_fs::Error>`)
+/// — this handles both the `FilePath::Path(PathBuf)` variant (returned on desktop/macOS)
+/// and the `FilePath::Url(url::Url)` variant (mobile/content URIs) by calling
+/// `url::Url::to_file_path` on the latter.
+#[tauri::command]
+pub async fn export_save(
+    app: tauri::AppHandle,
+    default_name: String,
+    content: String,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let chosen = app
+        .dialog()
+        .file()
+        .set_file_name(&default_name)
+        .blocking_save_file();
+    match chosen {
+        Some(path) => {
+            let pb = path
+                .into_path()
+                .map_err(|e| e.to_string())?;
+            std::fs::write(&pb, content).map_err(|e| e.to_string())?;
+            Ok(Some(pb.to_string_lossy().to_string()))
+        }
+        None => Ok(None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

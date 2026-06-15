@@ -14,6 +14,7 @@ pub fn run() {
             fs_commands::rename,
             fs_commands::delete,
             fs_commands::watch_workspace,
+            fs_commands::export_save,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
