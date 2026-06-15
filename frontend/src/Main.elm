@@ -36,6 +36,8 @@ init _ =
       , error = Nothing
       , content = ""
       , loadedContent = ""
+      , loadedMtime = 0
+      , externalConflict = False
       , parsedDoc = Nothing
       , language = Nothing
       , isLight = True
@@ -104,8 +106,39 @@ update msg model =
         DismissError ->
             ( { model | error = Nothing }, Cmd.none )
 
-        GotFileChanged _ ->
-            ( model, Cmd.none )
+        GotFileChanged value ->
+            case D.decodeValue (D.map2 Tuple.pair (D.field "path" D.string) (D.field "mtime" D.int)) value of
+                Ok ( path, mtime ) ->
+                    if Just path == model.selectedPath && mtime > model.loadedMtime && model.saveState.saveStatus /= SaveState.Saving then
+                        ( { model | externalConflict = True }, Cmd.none )
+
+                    else
+                        ( model, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
+
+        ClickedReloadExternal ->
+            case ( model.vaultRoot, model.selectedPath ) of
+                ( Just root, Just path ) ->
+                    request (PReadFile path)
+                        "read_file"
+                        [ ( "root", E.string root ), ( "path", E.string path ) ]
+                        { model | externalConflict = False }
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ClickedKeepMine ->
+            case ( model.vaultRoot, model.selectedPath ) of
+                ( Just root, Just path ) ->
+                    request (PWriteFile path)
+                        "write_file"
+                        [ ( "root", E.string root ), ( "path", E.string path ), ( "content", E.string model.content ) ]
+                        { model | externalConflict = False }
+
+                _ ->
+                    ( model, Cmd.none )
 
         EditorChanged newText ->
             let
@@ -244,7 +277,14 @@ handleResponse op resp model =
                 PPickWorkspace ->
                     case D.decodeValue (D.nullable D.string) result of
                         Ok (Just root) ->
-                            request PListWorkspace "list_workspace" [ ( "root", E.string root ) ] { model | vaultRoot = Just root }
+                            let
+                                ( m1, c1 ) =
+                                    request PListWorkspace "list_workspace" [ ( "root", E.string root ) ] { model | vaultRoot = Just root }
+
+                                ( m2, c2 ) =
+                                    request PNoop "watch_workspace" [ ( "root", E.string root ) ] m1
+                            in
+                            ( m2, Cmd.batch [ c1, c2 ] )
 
                         Ok Nothing ->
                             -- user cancelled the folder picker
@@ -262,8 +302,8 @@ handleResponse op resp model =
                             ( { model | error = Just (D.errorToString e) }, Cmd.none )
 
                 PReadFile _ ->
-                    case D.decodeValue (D.field "content" D.string) result of
-                        Ok content ->
+                    case D.decodeValue (D.map2 Tuple.pair (D.field "content" D.string) (D.field "mtime" D.int)) result of
+                        Ok ( content, mtime ) ->
                             let
                                 parsed =
                                     if model.language == Just Language.Scripta then
@@ -272,13 +312,26 @@ handleResponse op resp model =
                                     else
                                         Nothing
                             in
-                            ( { model | content = content, loadedContent = content, parsedDoc = parsed }, Cmd.none )
+                            ( { model
+                                | content = content
+                                , loadedContent = content
+                                , loadedMtime = mtime
+                                , externalConflict = False
+                                , parsedDoc = parsed
+                              }
+                            , Cmd.none
+                            )
 
                         Err e ->
                             ( { model | error = Just (D.errorToString e) }, Cmd.none )
 
                 PWriteFile _ ->
-                    update (GotSaveResult resp.requestId) model
+                    case D.decodeValue D.int result of
+                        Ok mtime ->
+                            update (GotSaveResult resp.requestId) { model | loadedMtime = mtime }
+
+                        Err _ ->
+                            update (GotSaveResult resp.requestId) model
 
                 PCreateFile _ ->
                     relist model
@@ -291,6 +344,9 @@ handleResponse op resp model =
 
                 PDelete _ ->
                     relist { model | selectedPath = Nothing, content = "", loadedContent = "", parsedDoc = Nothing }
+
+                PNoop ->
+                    ( model, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )

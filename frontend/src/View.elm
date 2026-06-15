@@ -14,45 +14,64 @@ import Workspace exposing (Node(..))
 
 view : Model -> Html Msg
 view model =
-    div [ style "display" "flex", style "height" "100vh", style "font-family" "system-ui" ]
-        [ div [ style "width" "260px", style "border-right" "1px solid #ddd", style "padding" "8px", style "overflow" "auto" ]
-            (button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
-                :: errorBanner model
-                ++ [ treeView model.tree
-                   , div [ style "font-size" "12px", style "color" "#666", style "margin-top" "6px" ]
-                        [ text (saveLabel model.saveState.saveStatus) ]
-                   , div [ style "margin-top" "8px" ]
-                        [ Html.input
-                            [ Html.Attributes.placeholder "new-file-name"
-                            , Html.Attributes.value model.newName
-                            , onInput SetNewName
-                            , style "width" "150px"
-                            ]
-                            []
-                        , button [ onClick ClickedNewFile ] [ text "New" ]
-                        , button [ onClick ClickedRename ] [ text "Rename" ]
-                        ]
-                   , div [ style "margin-top" "4px" ]
-                        [ button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
-                        , button [ onClick ClickedChangeVault ] [ text "Change Vault" ]
-                        ]
-                   ]
-            )
-        , Html.node "codemirror-editor"
-            [ Html.Attributes.attribute "text" model.loadedContent
-            , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
-            , style "flex" "1"
-            , style "border-right" "1px solid #ddd"
+    let
+        threePaneRow =
+            div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
+                [ div [ style "width" "260px", style "border-right" "1px solid #ddd", style "padding" "8px", style "overflow" "auto" ]
+                    (button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
+                        :: errorBanner model
+                        ++ [ treeView model.tree
+                           , div [ style "font-size" "12px", style "color" "#666", style "margin-top" "6px" ]
+                                [ text (saveLabel model.saveState.saveStatus) ]
+                           , div [ style "margin-top" "8px" ]
+                                [ Html.input
+                                    [ Html.Attributes.placeholder "new-file-name"
+                                    , Html.Attributes.value model.newName
+                                    , onInput SetNewName
+                                    , style "width" "150px"
+                                    ]
+                                    []
+                                , button [ onClick ClickedNewFile ] [ text "New" ]
+                                , button [ onClick ClickedRename ] [ text "Rename" ]
+                                ]
+                           , div [ style "margin-top" "4px" ]
+                                [ button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
+                                , button [ onClick ClickedChangeVault ] [ text "Change Vault" ]
+                                ]
+                           ]
+                    )
+                , Html.node "codemirror-editor"
+                    [ Html.Attributes.attribute "text" model.loadedContent
+                    , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
+                    , style "flex" "1"
+                    , style "border-right" "1px solid #ddd"
+                    ]
+                    []
+                , div
+                    [ Html.Attributes.id Editor.renderedTextId
+                    , style "flex" "1"
+                    , style "padding" "16px"
+                    , style "overflow" "auto"
+                    ]
+                    (previewBody model)
+                ]
+    in
+    div [ style "display" "flex", style "flex-direction" "column", style "height" "100vh", style "font-family" "system-ui" ]
+        (conflictBanner model ++ [ threePaneRow ])
+
+
+conflictBanner : Model -> List (Html Msg)
+conflictBanner model =
+    if model.externalConflict then
+        [ div [ style "background" "#ffd", style "padding" "8px", style "border-bottom" "1px solid #cc0" ]
+            [ text "This file changed on disk. "
+            , button [ onClick ClickedReloadExternal ] [ text "Reload" ]
+            , button [ onClick ClickedKeepMine ] [ text "Keep mine" ]
             ]
-            []
-        , div
-            [ Html.Attributes.id Editor.renderedTextId
-            , style "flex" "1"
-            , style "padding" "16px"
-            , style "overflow" "auto"
-            ]
-            (previewBody model)
         ]
+
+    else
+        []
 
 
 saveLabel : SaveState.SaveStatus -> String

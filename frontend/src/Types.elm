@@ -17,6 +17,8 @@ type alias Model =
     , error : Maybe String
     , content : String
     , loadedContent : String
+    , loadedMtime : Int
+    , externalConflict : Bool
     , parsedDoc : Maybe Scripta.Document
     , language : Maybe Language.Language
     , isLight : Bool
@@ -38,6 +40,7 @@ type PendingOp
     | PRename String String
     | PDelete String
     | PExportSave
+    | PNoop
 
 
 type Pane
@@ -62,3 +65,5 @@ type Msg
     | ClickedRenameSelected String
     | ClickedChangeVault
     | ClickedRename
+    | ClickedReloadExternal
+    | ClickedKeepMine
