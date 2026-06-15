@@ -5,6 +5,12 @@ pub fn run() {
     let launch = fs_commands::launch_file_from_args(&args);
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            use tauri::Emitter;
+            if let Some(path) = fs_commands::launch_file_from_args(&argv) {
+                let _ = app.emit("open-file", serde_json::json!({ "path": path }));
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .manage(fs_commands::WatcherState::default())
         .manage(fs_commands::LaunchFile(std::sync::Mutex::new(launch)))
