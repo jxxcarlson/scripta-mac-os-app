@@ -88,8 +88,12 @@ handleResponse op resp model =
                         Ok (Just root) ->
                             request PListWorkspace "list_workspace" [ ( "root", E.string root ) ] { model | vaultRoot = Just root }
 
-                        _ ->
+                        Ok Nothing ->
+                            -- user cancelled the folder picker
                             ( model, Cmd.none )
+
+                        Err e ->
+                            ( { model | error = Just (D.errorToString e) }, Cmd.none )
 
                 PListWorkspace ->
                     case D.decodeValue (D.list Workspace.entryDecoder) result of
