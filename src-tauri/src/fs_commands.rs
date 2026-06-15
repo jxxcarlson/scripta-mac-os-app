@@ -70,6 +70,23 @@ pub fn list_workspace(root: String) -> Result<Vec<Entry>, String> {
     list_workspace_impl(Path::new(&root))
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileContent {
+    pub content: String,
+    pub mtime: u64,
+}
+
+pub fn read_file_impl(root: &Path, rel: &str) -> Result<FileContent, String> {
+    let abs = root.join(rel);
+    let content = std::fs::read_to_string(&abs).map_err(|e| e.to_string())?;
+    Ok(FileContent { content, mtime: mtime_ms(&abs) })
+}
+
+#[tauri::command]
+pub fn read_file(root: String, path: String) -> Result<FileContent, String> {
+    read_file_impl(Path::new(&root), &path)
+}
+
 /// Opens a native folder-picker dialog and returns the chosen path as a UTF-8 string,
 /// or `None` if the user cancels.
 ///
@@ -116,5 +133,22 @@ mod tests {
         let scripta_entry = entries.iter().find(|e| e.path == "a.scripta").unwrap();
         assert!(!scripta_entry.is_dir);
         assert!(scripta_entry.mtime > 0);
+    }
+
+    #[test]
+    fn reads_file_content_and_mtime() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        fs::write(root.join("a.scripta"), "# Title\nbody").unwrap();
+
+        let fc = read_file_impl(root, "a.scripta").unwrap();
+        assert_eq!(fc.content, "# Title\nbody");
+        assert!(fc.mtime > 0);
+    }
+
+    #[test]
+    fn read_missing_file_errors() {
+        let dir = tempdir().unwrap();
+        assert!(read_file_impl(dir.path(), "nope.scripta").is_err());
     }
 }
