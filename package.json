@@ -1,0 +1,7 @@
+{
+  "name": "mac-scripta-viewer-tooling",
+  "private": true,
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
