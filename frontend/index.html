@@ -16,6 +16,18 @@
     <style>
       html, body { margin: 0; height: 100%; }
       #app { height: 100vh; }
+
+      button, .cm-button {
+        background: #3a3a3a;
+        color: #fff;
+        border: 1px solid #555;
+        border-radius: 4px;
+        padding: 3px 10px;
+        font: inherit;
+        cursor: pointer;
+        background-image: none;
+      }
+      button:hover, .cm-button:hover { background: #4a4a4a; }
     </style>
   </head>
   <body>
@@ -108,6 +120,19 @@
       app.ports.scrollToElement.subscribe((id) => {
         const el = document.getElementById(id);
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+
+      // Per-vault open-folder persistence in localStorage
+      app.ports.saveOpenFolders.subscribe(({ vault, folders }) => {
+        try { localStorage.setItem('openFolders:' + vault, JSON.stringify(folders)); } catch (e) {}
+      });
+      app.ports.requestOpenFolders.subscribe((vault) => {
+        let folders = [];
+        try {
+          const raw = localStorage.getItem('openFolders:' + vault);
+          folders = raw ? JSON.parse(raw) : [];
+        } catch (e) { folders = []; }
+        app.ports.gotOpenFolders.send(folders);
       });
     </script>
   </body>
