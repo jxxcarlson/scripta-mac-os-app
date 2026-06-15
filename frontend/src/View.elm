@@ -8,6 +8,9 @@ import Json.Decode as D
 import Language
 import Render
 import SaveState
+import Set exposing (Set)
+import Svg
+import Svg.Attributes as SA
 import Types exposing (Model, Msg(..))
 import Workspace exposing (Node(..))
 
@@ -20,7 +23,7 @@ view model =
                 [ div [ style "width" "260px", style "border-right" "1px solid #ddd", style "padding" "8px", style "overflow" "auto" ]
                     (button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
                         :: errorBanner model
-                        ++ [ treeView model.tree
+                        ++ [ treeView model.openFolders model.tree
                            , div [ style "font-size" "12px", style "color" "#666", style "margin-top" "6px" ]
                                 [ text (saveLabel model.saveState.saveStatus) ]
                            , div [ style "margin-top" "8px" ]
@@ -104,23 +107,64 @@ errorBanner model =
             []
 
 
-treeView : List Node -> Html Msg
-treeView nodes =
-    ul [ style "list-style" "none", style "padding-left" "12px" ]
-        (List.map nodeView nodes)
+{-| A small folder glyph: filled black when closed, outline-only when open.
+-}
+folderIcon : Bool -> Html msg
+folderIcon isOpen =
+    Svg.svg
+        [ SA.width "13"
+        , SA.height "13"
+        , SA.viewBox "0 0 16 16"
+        , SA.style "vertical-align: middle; margin-right: 5px;"
+        ]
+        [ Svg.path
+            [ SA.d "M1.5 4 H6 L7.5 5.5 H14.5 V13 H1.5 Z"
+            , SA.stroke "#000"
+            , SA.strokeWidth "1"
+            , SA.fill
+                (if isOpen then
+                    "none"
+
+                 else
+                    "#000"
+                )
+            ]
+            []
+        ]
 
 
-nodeView : Node -> Html Msg
-nodeView node =
+treeView : Set String -> List Node -> Html Msg
+treeView openFolders nodes =
+    ul
+        [ style "list-style" "none"
+        , style "padding-left" "12px"
+        , style "font-size" "13px"
+        ]
+        (List.map (nodeView openFolders) nodes)
+
+
+nodeView : Set String -> Node -> Html Msg
+nodeView openFolders node =
     case node of
         FileNode r ->
             li [ onClick (ClickedTreeNode r.path), style "cursor" "pointer" ] [ text r.name ]
 
         FolderNode r ->
+            let
+                isOpen =
+                    Set.member r.path openFolders
+            in
             li []
-                [ text ("\u{1F4C1} " ++ r.name)
-                , treeView r.children
-                ]
+                (div
+                    [ onClick (ToggledFolder r.path), style "cursor" "pointer" ]
+                    [ folderIcon isOpen, text r.name ]
+                    :: (if isOpen then
+                            [ treeView openFolders r.children ]
+
+                        else
+                            []
+                       )
+                )
 
 
 previewBody : Model -> List (Html Msg)
