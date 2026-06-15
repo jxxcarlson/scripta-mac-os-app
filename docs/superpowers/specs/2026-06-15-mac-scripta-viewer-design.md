@@ -115,9 +115,16 @@ Parse errors need no special handling — the compiler renders error blocks inli
 
 ### Math (KaTeX, offline)
 
-Bundle `katex.min.css` + KaTeX JS + auto-render as app resources. After each
-render the preview container is re-typeset via a `typesetMath` port fired after
-Elm patches the DOM. No network access.
+KaTeX is **vendored into the repo** — `katex.min.css`, the KaTeX JS, the
+auto-render extension, and the KaTeX fonts are committed as app assets (e.g.
+`frontend/vendor/katex/`) and bundled by Tauri. Nothing is fetched from a CDN
+at build time or run time, so the app renders math with **no internet
+connection**. After each render the preview container is re-typeset via a
+`typesetMath` port fired after Elm patches the DOM.
+
+Note: KaTeX ships web fonts (`.woff2` etc.); these must be vendored alongside
+the CSS and the CSS `@font-face` URLs must resolve to the local copies, or math
+glyphs will fall back to system fonts.
 
 ### `.tex` / `.md` seam (designed now, wired later)
 
