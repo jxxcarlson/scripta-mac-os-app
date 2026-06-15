@@ -99,6 +99,11 @@
         app.ports.fileChanged.send(e.payload);
       });
 
+      // open-file events forwarded by the single-instance plugin: Rust -> Elm
+      listen('open-file', (e) => {
+        app.ports.openFile.send(e.payload);
+      });
+
       // scrollToElement port
       app.ports.scrollToElement.subscribe((id) => {
         const el = document.getElementById(id);
