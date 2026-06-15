@@ -1,7 +1,7 @@
 module View exposing (view)
 
 import Editor
-import Html exposing (Html, button, div, li, text, ul)
+import Html exposing (Html, button, div, li, span, text, ul)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as D
@@ -151,10 +151,12 @@ nodeView openFolders node =
                 [ onClick (ClickedTreeNode r.path)
                 , style "cursor" "pointer"
                 , style "margin-bottom" "4px"
-                , style "padding-left" "2em"
-                , style "text-indent" "-2em"
+                , style "display" "flex"
+                , style "align-items" "flex-start"
                 ]
-                [ text r.name ]
+                [ span [ style "flex" "0 0 auto", style "margin-right" "5px" ] [ text "-" ]
+                , span [ style "flex" "1 1 auto" ] [ text r.name ]
+                ]
 
         FolderNode r ->
             let
@@ -166,10 +168,12 @@ nodeView openFolders node =
                     [ onClick (ToggledFolder r.path)
                     , style "cursor" "pointer"
                     , style "margin-bottom" "4px"
-                    , style "padding-left" "2em"
-                    , style "text-indent" "-2em"
+                    , style "display" "flex"
+                    , style "align-items" "flex-start"
                     ]
-                    [ folderIcon isOpen, text r.name ]
+                    [ span [ style "flex" "0 0 auto", style "margin-right" "5px" ] [ folderIcon isOpen ]
+                    , span [ style "flex" "1 1 auto" ] [ text r.name ]
+                    ]
                     :: (if isOpen then
                             [ treeView openFolders r.children ]
 
