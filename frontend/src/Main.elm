@@ -52,6 +52,7 @@ init _ =
         , saveState = SaveState.init
         , newName = ""
         , openFolders = Set.empty
+        , searchQuery = ""
         }
 
 
@@ -322,6 +323,9 @@ update msg model =
 
         GotOpenFolders value ->
             ( { model | openFolders = OpenFolders.fromValue value }, Cmd.none )
+
+        SetSearchQuery q ->
+            ( { model | searchQuery = q }, Cmd.none )
 
         GotOpenFile value ->
             case D.decodeValue (D.field "path" D.string) value of

@@ -23,7 +23,8 @@ view model =
                 [ div [ style "width" "260px", style "border-right" "1px solid #ddd", style "padding" "8px", style "overflow" "auto" ]
                     (button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
                         :: errorBanner model
-                        ++ [ treeView model.openFolders model.tree
+                        ++ [ searchBox model
+                           , fileTree model
                            , div [ style "font-size" "12px", style "color" "#666", style "margin-top" "6px" ]
                                 [ text (saveLabel model.saveState.saveStatus) ]
                            , div [ style "margin-top" "8px" ]
@@ -133,18 +134,47 @@ folderIcon isOpen =
         ]
 
 
-treeView : Set String -> List Node -> Html Msg
-treeView openFolders nodes =
+searchBox : Model -> Html Msg
+searchBox model =
+    Html.input
+        [ Html.Attributes.placeholder "Search documents\u{2026}"
+        , Html.Attributes.value model.searchQuery
+        , onInput SetSearchQuery
+        , style "width" "100%"
+        , style "box-sizing" "border-box"
+        , style "margin-bottom" "8px"
+        ]
+        []
+
+
+{-| The file tree, filtered to matching documents while a search is active
+(folders containing matches are force-expanded so matches are visible).
+-}
+fileTree : Model -> Html Msg
+fileTree model =
+    let
+        q =
+            String.trim model.searchQuery
+    in
+    if String.isEmpty q then
+        treeView False model.openFolders model.tree
+
+    else
+        treeView True model.openFolders (Workspace.filter q model.tree)
+
+
+treeView : Bool -> Set String -> List Node -> Html Msg
+treeView forceOpen openFolders nodes =
     ul
         [ style "list-style" "none"
         , style "padding-left" "12px"
         , style "font-size" "13px"
         ]
-        (List.map (nodeView openFolders) nodes)
+        (List.map (nodeView forceOpen openFolders) nodes)
 
 
-nodeView : Set String -> Node -> Html Msg
-nodeView openFolders node =
+nodeView : Bool -> Set String -> Node -> Html Msg
+nodeView forceOpen openFolders node =
     case node of
         FileNode r ->
             li
@@ -161,7 +191,7 @@ nodeView openFolders node =
         FolderNode r ->
             let
                 isOpen =
-                    Set.member r.path openFolders
+                    forceOpen || Set.member r.path openFolders
             in
             li []
                 (div
@@ -175,7 +205,7 @@ nodeView openFolders node =
                     , span [ style "flex" "1 1 auto" ] [ text r.name ]
                     ]
                     :: (if isOpen then
-                            [ treeView openFolders r.children ]
+                            [ treeView forceOpen openFolders r.children ]
 
                         else
                             []

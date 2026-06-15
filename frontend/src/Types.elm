@@ -27,6 +27,7 @@ type alias Model =
     , saveState : SaveState.SaveState
     , newName : String
     , openFolders : Set String
+    , searchQuery : String
     }
 
 
@@ -74,3 +75,4 @@ type Msg
     | GotOpenFile D.Value
     | ToggledFolder String
     | GotOpenFolders D.Value
+    | SetSearchQuery String

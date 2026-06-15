@@ -1,6 +1,6 @@
 module Workspace exposing
     ( Entry, Node(..)
-    , entryDecoder, toTree
+    , entryDecoder, toTree, filter
     , nodeName, nodePath, folderChildren
     )
 
@@ -69,6 +69,39 @@ buildLevel parent entries =
                 else
                     FileNode { path = e.path, name = e.name, mtime = e.mtime }
             )
+
+
+{-| Keep only file nodes whose name contains `query` (case-insensitive), plus
+the folders on the path to any such file. Folders are matched only through their
+descendants — a folder name itself never matches. An empty result means nothing
+matched.
+-}
+filter : String -> List Node -> List Node
+filter query nodes =
+    let
+        q =
+            String.toLower query
+    in
+    List.filterMap (filterNode q) nodes
+
+
+filterNode : String -> Node -> Maybe Node
+filterNode q node =
+    case node of
+        FileNode r ->
+            if String.contains q (String.toLower r.name) then
+                Just node
+
+            else
+                Nothing
+
+        FolderNode r ->
+            case List.filterMap (filterNode q) r.children of
+                [] ->
+                    Nothing
+
+                kept ->
+                    Just (FolderNode { r | children = kept })
 
 
 nodeName : Node -> String
