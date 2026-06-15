@@ -1,1 +1,109 @@
-<!doctype html><html><body>boot</body></html>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mac Scripta Viewer</title>
+
+    <!-- Vendored KaTeX (offline) -->
+    <link rel="stylesheet" href="vendor/katex/katex.min.css" />
+    <script src="vendor/katex/katex.min.js"></script>
+    <script src="vendor/katex/mhchem.min.js"></script>
+
+    <!-- Vendored CodeMirror custom element -->
+    <script src="vendor/codemirror-element.js"></script>
+
+    <style>
+      html, body { margin: 0; height: 100%; }
+      #app { height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="dist/elm.js"></script>
+    <script>
+      // --- math-text custom element (pasted verbatim from scripta-app-v4) ---
+      class MathText extends HTMLElement {
+          static get observedAttributes() { return ['content', 'display']; }
+          connectedCallback() { this.renderMath(); }
+          attributeChangedCallback() { this.renderMath(); }
+          renderMath() {
+              var content = this.getAttribute('content') || '';
+              var displayMode = this.getAttribute('display') === 'true';
+              try {
+                  this.innerHTML = katex.renderToString(content, {
+                      displayMode: displayMode,
+                      throwOnError: false,
+                      trust: true
+                  });
+                  // Check if KaTeX rendered an error (throwOnError:false produces .katex-error spans)
+                  var errSpan = this.querySelector('.katex-error');
+                  if (errSpan) {
+                      this.dataset.katexError = 'true';
+                      this.dispatchEvent(new CustomEvent('katex-error', {
+                          bubbles: true,
+                          detail: {
+                              id: this.closest('[id]') ? this.closest('[id]').id : '',
+                              begin: parseInt(this.closest('[data-begin]')?.getAttribute('data-begin') || '0'),
+                              end: parseInt(this.closest('[data-end]')?.getAttribute('data-end') || '0'),
+                              content: content,
+                              error: errSpan.textContent || 'KaTeX error'
+                          }
+                      }));
+                  } else if (this.dataset.katexError) {
+                      delete this.dataset.katexError;
+                      this.dispatchEvent(new CustomEvent('katex-ok', {
+                          bubbles: true,
+                          detail: { id: this.closest('[id]') ? this.closest('[id]').id : '' }
+                      }));
+                  }
+              } catch(e) {
+                  this.innerHTML = '<span style="color:red">' + e.message + '</span>';
+                  this.dataset.katexError = 'true';
+                  this.dispatchEvent(new CustomEvent('katex-error', {
+                      bubbles: true,
+                      detail: {
+                          id: this.closest('[id]') ? this.closest('[id]').id : '',
+                          begin: parseInt(this.closest('[data-begin]')?.getAttribute('data-begin') || '0'),
+                          end: parseInt(this.closest('[data-end]')?.getAttribute('data-end') || '0'),
+                          content: content,
+                          error: e.message
+                      }
+                  }));
+              }
+          }
+          set content(val) { this.setAttribute('content', val); }
+          set display(val) { this.setAttribute('display', val); }
+      }
+      customElements.define('math-text', MathText);
+
+      // --- Tauri global API (withGlobalTauri) ---
+      const { invoke } = window.__TAURI__.core;
+      const { listen } = window.__TAURI__.event;
+
+      // --- Boot Elm ---
+      const app = Elm.Main.init({ node: document.getElementById('app') });
+
+      // FS request bridge: Elm -> invoke -> Elm
+      app.ports.fsRequest.subscribe(async (req) => {
+        try {
+          const result = await invoke(req.op, req.args || {});
+          app.ports.fsResponse.send({ requestId: req.requestId, ok: true, result });
+        } catch (e) {
+          app.ports.fsResponse.send({ requestId: req.requestId, ok: false, error: String(e) });
+        }
+      });
+
+      // Watcher events: Rust -> Elm
+      listen('file-changed', (e) => {
+        app.ports.fileChanged.send(e.payload);
+      });
+
+      // scrollToElement port
+      app.ports.scrollToElement.subscribe((id) => {
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    </script>
+  </body>
+</html>
