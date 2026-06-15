@@ -22,8 +22,9 @@ fn has_doc_ext(p: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// List all document files (and the dirs containing them) under `root`,
-/// returning entries with workspace-relative paths.
+/// List every directory and every document file (extension scripta/tex/md)
+/// under `root`, returning entries with workspace-relative, '/'-separated paths.
+/// Entries are sorted by path. Non-UTF-8 paths are skipped.
 pub fn list_workspace_impl(root: &Path) -> Result<Vec<Entry>, String> {
     let mut out = Vec::new();
     for dent in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
@@ -35,15 +36,18 @@ pub fn list_workspace_impl(root: &Path) -> Result<Vec<Entry>, String> {
         if !is_dir && !has_doc_ext(p) {
             continue;
         }
-        let rel = p
-            .strip_prefix(root)
-            .map_err(|e| e.to_string())?
-            .to_string_lossy()
-            .replace('\\', "/");
+        let rel = match p.strip_prefix(root).ok().and_then(|r| r.to_str()) {
+            Some(s) => s.replace('\\', "/"),
+            None => continue,
+        };
+        let name = match dent.file_name().to_str() {
+            Some(s) => s.to_string(),
+            None => continue,
+        };
         let mtime = if is_dir { 0 } else { mtime_ms(p) };
         out.push(Entry {
             path: rel,
-            name: dent.file_name().to_string_lossy().to_string(),
+            name,
             is_dir,
             mtime,
         });
@@ -60,7 +64,6 @@ fn mtime_ms(p: &Path) -> u64 {
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -84,5 +87,13 @@ mod tests {
         assert!(paths.contains(&"sub"));
         assert!(paths.contains(&"sub/b.tex"));
         assert!(!paths.iter().any(|p| p.contains("ignore.png")));
+
+        let sub_entry = entries.iter().find(|e| e.path == "sub").unwrap();
+        assert!(sub_entry.is_dir);
+        assert_eq!(sub_entry.mtime, 0);
+
+        let scripta_entry = entries.iter().find(|e| e.path == "a.scripta").unwrap();
+        assert!(!scripta_entry.is_dir);
+        assert!(scripta_entry.mtime > 0);
     }
 }
