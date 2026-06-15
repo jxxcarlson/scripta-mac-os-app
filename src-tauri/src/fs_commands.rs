@@ -1,6 +1,54 @@
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use tauri::Emitter;
 use walkdir::WalkDir;
+
+#[derive(Default)]
+pub struct WatcherState(pub Mutex<Option<RecommendedWatcher>>);
+
+#[derive(Clone, Serialize)]
+struct FileChanged {
+    path: String,
+    mtime: u64,
+}
+
+#[tauri::command]
+pub fn watch_workspace(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, WatcherState>,
+    root: String,
+) -> Result<(), String> {
+    let root_path = PathBuf::from(&root);
+    let app_handle = app.clone();
+    let root_for_cb = root_path.clone();
+
+    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        if let Ok(event) = res {
+            for p in event.paths {
+                if !has_doc_ext(&p) {
+                    continue;
+                }
+                if let Ok(rel) = p.strip_prefix(&root_for_cb) {
+                    let payload = FileChanged {
+                        path: rel.to_string_lossy().replace('\\', "/"),
+                        mtime: mtime_ms(&p),
+                    };
+                    let _ = app_handle.emit("file-changed", payload);
+                }
+            }
+        }
+    })
+    .map_err(|e| e.to_string())?;
+
+    watcher
+        .watch(&root_path, RecursiveMode::Recursive)
+        .map_err(|e| e.to_string())?;
+
+    *state.0.lock().map_err(|e| e.to_string())? = Some(watcher);
+    Ok(())
+}
 
 /// One entry in the workspace tree, as sent to Elm.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

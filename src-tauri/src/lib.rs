@@ -3,6 +3,7 @@ mod fs_commands;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(fs_commands::WatcherState::default())
         .invoke_handler(tauri::generate_handler![
             fs_commands::list_workspace,
             fs_commands::pick_workspace,
@@ -12,6 +13,7 @@ pub fn run() {
             fs_commands::create_file,
             fs_commands::rename,
             fs_commands::delete,
+            fs_commands::watch_workspace,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
