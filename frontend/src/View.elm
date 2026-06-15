@@ -1,8 +1,11 @@
 module View exposing (view)
 
+import Editor
 import Html exposing (Html, button, div, li, text, ul)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
+import Language
+import Render
 import Types exposing (Model, Msg(..))
 import Workspace exposing (Node(..))
 
@@ -15,8 +18,13 @@ view model =
                 :: errorBanner model
                 ++ [ treeView model.tree ]
             )
-        , div [ style "flex" "1", style "padding" "8px" ]
-            [ text (Maybe.withDefault "No file selected" model.selectedPath) ]
+        , div
+            [ Html.Attributes.id Editor.renderedTextId
+            , style "flex" "1"
+            , style "padding" "16px"
+            , style "overflow" "auto"
+            ]
+            (previewBody model)
         ]
 
 
@@ -50,3 +58,21 @@ nodeView node =
                 [ text ("\u{1F4C1} " ++ r.name)
                 , treeView r.children
                 ]
+
+
+previewBody : Model -> List (Html Msg)
+previewBody model =
+    case ( model.language, model.parsedDoc ) of
+        ( Just Language.Scripta, Just doc ) ->
+            let
+                out =
+                    Render.renderDocument model.isLight model.contentWidth doc
+            in
+            (out.title :: out.body)
+                |> List.map (Html.map (\_ -> NoOpFromRender))
+
+        ( Just lang, _ ) ->
+            [ Html.text (Language.label lang ++ " rendering is not yet supported.") ]
+
+        ( Nothing, _ ) ->
+            [ Html.text "Open a .scripta file." ]

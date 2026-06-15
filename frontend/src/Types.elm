@@ -2,6 +2,8 @@ module Types exposing (Model, Msg(..), PendingOp(..), Pane(..))
 
 import Dict exposing (Dict)
 import Json.Decode as D
+import Language
+import Scripta
 import Workspace exposing (Node)
 
 
@@ -12,6 +14,11 @@ type alias Model =
     , nextRequestId : Int
     , pending : Dict Int PendingOp
     , error : Maybe String
+    , content : String
+    , parsedDoc : Maybe Scripta.Document
+    , language : Maybe Language.Language
+    , isLight : Bool
+    , contentWidth : Int
     }
 
 
@@ -41,3 +48,4 @@ type Msg
     | GotFsResponse D.Value
     | GotFileChanged D.Value
     | DismissError
+    | NoOpFromRender

@@ -5,6 +5,8 @@ import Dict
 import FileOps
 import Json.Decode as D
 import Json.Encode as E
+import Language
+import Render
 import Types exposing (Model, Msg(..), PendingOp(..))
 import View
 import Workspace
@@ -28,6 +30,11 @@ init _ =
       , nextRequestId = 0
       , pending = Dict.empty
       , error = Nothing
+      , content = ""
+      , parsedDoc = Nothing
+      , language = Nothing
+      , isLight = True
+      , contentWidth = 500
       }
     , Cmd.none
     )
@@ -53,7 +60,18 @@ update msg model =
             request PPickWorkspace "pick_workspace" [] model
 
         ClickedTreeNode path ->
-            ( { model | selectedPath = Just path }, Cmd.none )
+            case model.vaultRoot of
+                Just root ->
+                    request (PReadFile path)
+                        "read_file"
+                        [ ( "root", E.string root ), ( "path", E.string path ) ]
+                        { model | selectedPath = Just path, language = Language.fromPath path }
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        NoOpFromRender ->
+            ( model, Cmd.none )
 
         DismissError ->
             ( { model | error = Nothing }, Cmd.none )
@@ -99,6 +117,22 @@ handleResponse op resp model =
                     case D.decodeValue (D.list Workspace.entryDecoder) result of
                         Ok entries ->
                             ( { model | tree = Workspace.toTree entries }, Cmd.none )
+
+                        Err e ->
+                            ( { model | error = Just (D.errorToString e) }, Cmd.none )
+
+                PReadFile _ ->
+                    case D.decodeValue (D.field "content" D.string) result of
+                        Ok content ->
+                            let
+                                parsed =
+                                    if model.language == Just Language.Scripta then
+                                        Just (Render.parse model.isLight model.contentWidth content)
+
+                                    else
+                                        Nothing
+                            in
+                            ( { model | content = content, parsedDoc = parsed }, Cmd.none )
 
                         Err e ->
                             ( { model | error = Just (D.errorToString e) }, Cmd.none )
