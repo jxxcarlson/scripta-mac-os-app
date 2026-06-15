@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use walkdir::WalkDir;
 
 /// One entry in the workspace tree, as sent to Elm.
@@ -61,10 +61,6 @@ fn mtime_ms(p: &Path) -> u64 {
         .unwrap_or(0)
 }
 
-#[allow(dead_code)]
-fn to_abs(root: &Path, rel: &str) -> PathBuf {
-    root.join(rel)
-}
 
 #[cfg(test)]
 mod tests {
