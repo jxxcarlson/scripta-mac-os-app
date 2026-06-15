@@ -35,6 +35,7 @@ init _ =
       , pending = Dict.empty
       , error = Nothing
       , content = ""
+      , loadedContent = ""
       , parsedDoc = Nothing
       , language = Nothing
       , isLight = True
@@ -151,7 +152,16 @@ handleResponse : PendingOp -> FileOps.FsResponse -> Model -> ( Model, Cmd Msg )
 handleResponse op resp model =
     case FileOps.resultOf resp of
         Err e ->
-            ( { model | error = Just e, saveState = Tuple.first (SaveState.saveFailed model.saveState) }, Cmd.none )
+            let
+                newSaveState =
+                    case op of
+                        PWriteFile _ ->
+                            Tuple.first (SaveState.saveFailed model.saveState)
+
+                        _ ->
+                            model.saveState
+            in
+            ( { model | error = Just e, saveState = newSaveState }, Cmd.none )
 
         Ok result ->
             case op of
@@ -186,7 +196,7 @@ handleResponse op resp model =
                                     else
                                         Nothing
                             in
-                            ( { model | content = content, parsedDoc = parsed }, Cmd.none )
+                            ( { model | content = content, loadedContent = content, parsedDoc = parsed }, Cmd.none )
 
                         Err e ->
                             ( { model | error = Just (D.errorToString e) }, Cmd.none )

@@ -16,6 +16,7 @@ type alias Model =
     , pending : Dict Int PendingOp
     , error : Maybe String
     , content : String
+    , loadedContent : String
     , parsedDoc : Maybe Scripta.Document
     , language : Maybe Language.Language
     , isLight : Bool

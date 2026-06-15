@@ -24,7 +24,7 @@ view model =
                    ]
             )
         , Html.node "codemirror-editor"
-            [ Html.Attributes.attribute "text" model.content
+            [ Html.Attributes.attribute "text" model.loadedContent
             , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
             , style "flex" "1"
             , style "border-right" "1px solid #ddd"
