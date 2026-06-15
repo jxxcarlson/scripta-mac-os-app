@@ -65,6 +65,27 @@ fn mtime_ms(p: &Path) -> u64 {
         .unwrap_or(0)
 }
 
+#[tauri::command]
+pub fn list_workspace(root: String) -> Result<Vec<Entry>, String> {
+    list_workspace_impl(Path::new(&root))
+}
+
+/// Opens a native folder-picker dialog and returns the chosen path as a UTF-8 string,
+/// or `None` if the user cancels.
+///
+/// API deviation from the task snippet: we use `blocking_pick_folder()` instead of the
+/// callback + `std::sync::mpsc::channel` pattern. The blocking variant is purpose-built
+/// for async Tauri commands (it must NOT run on the main thread, which is guaranteed
+/// here because `#[tauri::command] async fn` is dispatched on the async runtime).
+/// `FilePath` is converted to `String` via its `Display` impl (`p.display()` for the
+/// `Path` variant, or the URL string for the `Url` variant).
+#[tauri::command]
+pub async fn pick_workspace(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let chosen = app.dialog().file().blocking_pick_folder();
+    Ok(chosen.map(|p| p.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

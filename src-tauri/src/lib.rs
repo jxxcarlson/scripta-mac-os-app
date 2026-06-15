@@ -3,6 +3,10 @@ mod fs_commands;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            fs_commands::list_workspace,
+            fs_commands::pick_workspace,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
