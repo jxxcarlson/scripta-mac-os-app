@@ -1,0 +1,11 @@
+#!/bin/sh
+# Open a file in Mac Scripta Viewer. Usage: scripta [file]
+if [ -n "$1" ]; then
+  if [ ! -e "$1" ]; then
+    echo "scripta: warning: '$1' does not exist; opening anyway" >&2
+  fi
+  abs="$(cd "$(dirname "$1")" 2>/dev/null && pwd)/$(basename "$1")"
+  open -na "Mac Scripta Viewer" --args "$abs"
+else
+  open -a "Mac Scripta Viewer"
+fi
