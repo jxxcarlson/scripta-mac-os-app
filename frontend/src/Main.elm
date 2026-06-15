@@ -12,6 +12,7 @@ import Render
 import SaveState
 import Scripta
 import Task
+import PathUtil
 import Types exposing (Model, Msg(..), PendingOp(..))
 import View
 import Workspace
@@ -214,7 +215,7 @@ update msg model =
                     else
                         let
                             dir =
-                                parentDir path
+                                PathUtil.parentDir path
 
                             newPath =
                                 (if dir == "" then
@@ -394,13 +395,3 @@ ensureScriptaExt name =
 
     else
         name ++ ".scripta"
-
-
-parentDir : String -> String
-parentDir path =
-    case path |> String.split "/" |> List.reverse of
-        _ :: rest ->
-            rest |> List.reverse |> String.join "/"
-
-        [] ->
-            ""
