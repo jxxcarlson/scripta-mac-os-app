@@ -3,7 +3,7 @@ module View exposing (view)
 import Editor
 import Html exposing (Html, button, div, li, text, ul)
 import Html.Attributes exposing (style)
-import Html.Events exposing (onClick)
+import Html.Events exposing (onClick, onInput)
 import Json.Decode as D
 import Language
 import Render
@@ -21,6 +21,21 @@ view model =
                 ++ [ treeView model.tree
                    , div [ style "font-size" "12px", style "color" "#666", style "margin-top" "6px" ]
                         [ text (saveLabel model.saveState.saveStatus) ]
+                   , div [ style "margin-top" "8px" ]
+                        [ Html.input
+                            [ Html.Attributes.placeholder "new-file-name"
+                            , Html.Attributes.value model.newName
+                            , onInput SetNewName
+                            , style "width" "150px"
+                            ]
+                            []
+                        , button [ onClick ClickedNewFile ] [ text "New" ]
+                        , button [ onClick ClickedRename ] [ text "Rename" ]
+                        ]
+                   , div [ style "margin-top" "4px" ]
+                        [ button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
+                        , button [ onClick ClickedChangeVault ] [ text "Change Vault" ]
+                        ]
                    ]
             )
         , Html.node "codemirror-editor"

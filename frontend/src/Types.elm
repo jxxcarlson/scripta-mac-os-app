@@ -22,6 +22,7 @@ type alias Model =
     , isLight : Bool
     , contentWidth : Int
     , saveState : SaveState.SaveState
+    , newName : String
     }
 
 
@@ -55,3 +56,9 @@ type Msg
     | EditorChanged String
     | DebounceFired Int
     | GotSaveResult Int
+    | SetNewName String
+    | ClickedNewFile
+    | ClickedDeleteSelected
+    | ClickedRenameSelected String
+    | ClickedChangeVault
+    | ClickedRename

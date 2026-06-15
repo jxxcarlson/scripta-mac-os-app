@@ -41,6 +41,7 @@ init _ =
       , isLight = True
       , contentWidth = 500
       , saveState = SaveState.init
+      , newName = ""
       }
     , Cmd.none
     )
@@ -134,6 +135,81 @@ update msg model =
             in
             applySaveAction action { model | saveState = ss }
 
+        SetNewName s ->
+            ( { model | newName = s }, Cmd.none )
+
+        ClickedChangeVault ->
+            request PPickWorkspace "pick_workspace" [] model
+
+        ClickedNewFile ->
+            case model.vaultRoot of
+                Just root ->
+                    let
+                        path =
+                            ensureScriptaExt model.newName
+                    in
+                    if String.isEmpty (String.trim model.newName) then
+                        ( model, Cmd.none )
+
+                    else
+                        request (PCreateFile path)
+                            "create_file"
+                            [ ( "root", E.string root ), ( "path", E.string path ), ( "content", E.string "" ) ]
+                            { model | newName = "" }
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        ClickedDeleteSelected ->
+            case ( model.vaultRoot, model.selectedPath ) of
+                ( Just root, Just path ) ->
+                    request (PDelete path)
+                        "delete"
+                        [ ( "root", E.string root ), ( "path", E.string path ) ]
+                        model
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ClickedRenameSelected newPath ->
+            case ( model.vaultRoot, model.selectedPath ) of
+                ( Just root, Just path ) ->
+                    request (PRename path newPath)
+                        "rename"
+                        [ ( "root", E.string root ), ( "path", E.string path ), ( "new_path", E.string newPath ) ]
+                        model
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ClickedRename ->
+            case ( model.vaultRoot, model.selectedPath ) of
+                ( Just root, Just path ) ->
+                    if String.isEmpty (String.trim model.newName) then
+                        ( model, Cmd.none )
+
+                    else
+                        let
+                            dir =
+                                parentDir path
+
+                            newPath =
+                                (if dir == "" then
+                                    ""
+
+                                 else
+                                    dir ++ "/"
+                                )
+                                    ++ ensureScriptaExt model.newName
+                        in
+                        request (PRename path newPath)
+                            "rename"
+                            [ ( "root", E.string root ), ( "path", E.string path ), ( "new_path", E.string newPath ) ]
+                            { model | newName = "" }
+
+                _ ->
+                    ( model, Cmd.none )
+
         GotFsResponse value ->
             case D.decodeValue FileOps.responseDecoder value of
                 Err e ->
@@ -204,6 +280,18 @@ handleResponse op resp model =
                 PWriteFile _ ->
                     update (GotSaveResult resp.requestId) model
 
+                PCreateFile _ ->
+                    relist model
+
+                PCreateDir _ ->
+                    relist model
+
+                PRename _ _ ->
+                    relist { model | selectedPath = Nothing, content = "", loadedContent = "", parsedDoc = Nothing }
+
+                PDelete _ ->
+                    relist { model | selectedPath = Nothing, content = "", loadedContent = "", parsedDoc = Nothing }
+
                 _ ->
                     ( model, Cmd.none )
 
@@ -214,3 +302,32 @@ subscriptions _ =
         [ FileOps.fsResponse GotFsResponse
         , FileOps.fileChanged GotFileChanged
         ]
+
+
+relist : Model -> ( Model, Cmd Msg )
+relist model =
+    case model.vaultRoot of
+        Just root ->
+            request PListWorkspace "list_workspace" [ ( "root", E.string root ) ] model
+
+        Nothing ->
+            ( model, Cmd.none )
+
+
+ensureScriptaExt : String -> String
+ensureScriptaExt name =
+    if String.endsWith ".scripta" name then
+        name
+
+    else
+        name ++ ".scripta"
+
+
+parentDir : String -> String
+parentDir path =
+    case path |> String.split "/" |> List.reverse of
+        _ :: rest ->
+            rest |> List.reverse |> String.join "/"
+
+        [] ->
+            ""
