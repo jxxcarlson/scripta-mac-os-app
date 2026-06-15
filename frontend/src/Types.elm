@@ -62,7 +62,6 @@ type Msg
     | SetNewName String
     | ClickedNewFile
     | ClickedDeleteSelected
-    | ClickedRenameSelected String
     | ClickedChangeVault
     | ClickedRename
     | ClickedReloadExternal

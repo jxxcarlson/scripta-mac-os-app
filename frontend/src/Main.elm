@@ -205,17 +205,6 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        ClickedRenameSelected newPath ->
-            case ( model.vaultRoot, model.selectedPath ) of
-                ( Just root, Just path ) ->
-                    request (PRename path newPath)
-                        "rename"
-                        [ ( "root", E.string root ), ( "path", E.string path ), ( "new_path", E.string newPath ) ]
-                        model
-
-                _ ->
-                    ( model, Cmd.none )
-
         ClickedRename ->
             case ( model.vaultRoot, model.selectedPath ) of
                 ( Just root, Just path ) ->
@@ -238,7 +227,7 @@ update msg model =
                         in
                         request (PRename path newPath)
                             "rename"
-                            [ ( "root", E.string root ), ( "path", E.string path ), ( "new_path", E.string newPath ) ]
+                            [ ( "root", E.string root ), ( "path", E.string path ), ( "newPath", E.string newPath ) ]
                             { model | newName = "" }
 
                 _ ->
