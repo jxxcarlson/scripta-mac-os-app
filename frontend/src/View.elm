@@ -4,8 +4,10 @@ import Editor
 import Html exposing (Html, button, div, li, text, ul)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
+import Json.Decode as D
 import Language
 import Render
+import SaveState
 import Types exposing (Model, Msg(..))
 import Workspace exposing (Node(..))
 
@@ -16,8 +18,18 @@ view model =
         [ div [ style "width" "260px", style "border-right" "1px solid #ddd", style "padding" "8px", style "overflow" "auto" ]
             (button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
                 :: errorBanner model
-                ++ [ treeView model.tree ]
+                ++ [ treeView model.tree
+                   , div [ style "font-size" "12px", style "color" "#666", style "margin-top" "6px" ]
+                        [ text (saveLabel model.saveState.saveStatus) ]
+                   ]
             )
+        , Html.node "codemirror-editor"
+            [ Html.Attributes.attribute "text" model.content
+            , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
+            , style "flex" "1"
+            , style "border-right" "1px solid #ddd"
+            ]
+            []
         , div
             [ Html.Attributes.id Editor.renderedTextId
             , style "flex" "1"
@@ -26,6 +38,19 @@ view model =
             ]
             (previewBody model)
         ]
+
+
+saveLabel : SaveState.SaveStatus -> String
+saveLabel status =
+    case status of
+        SaveState.Saved ->
+            "Saved"
+
+        SaveState.Unsaved ->
+            "Unsaved\u{2026}"
+
+        SaveState.Saving ->
+            "Saving\u{2026}"
 
 
 errorBanner : Model -> List (Html Msg)

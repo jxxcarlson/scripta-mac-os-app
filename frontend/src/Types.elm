@@ -3,6 +3,7 @@ module Types exposing (Model, Msg(..), PendingOp(..), Pane(..))
 import Dict exposing (Dict)
 import Json.Decode as D
 import Language
+import SaveState
 import Scripta
 import Workspace exposing (Node)
 
@@ -19,6 +20,7 @@ type alias Model =
     , language : Maybe Language.Language
     , isLight : Bool
     , contentWidth : Int
+    , saveState : SaveState.SaveState
     }
 
 
@@ -49,3 +51,6 @@ type Msg
     | GotFileChanged D.Value
     | DismissError
     | NoOpFromRender
+    | EditorChanged String
+    | DebounceFired Int
+    | GotSaveResult Int

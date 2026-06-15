@@ -6,7 +6,11 @@ import FileOps
 import Json.Decode as D
 import Json.Encode as E
 import Language
+import Process
 import Render
+import SaveState
+import Scripta
+import Task
 import Types exposing (Model, Msg(..), PendingOp(..))
 import View
 import Workspace
@@ -35,6 +39,7 @@ init _ =
       , language = Nothing
       , isLight = True
       , contentWidth = 500
+      , saveState = SaveState.init
       }
     , Cmd.none
     )
@@ -51,6 +56,27 @@ request op cmdName args model =
     ( { model | nextRequestId = rid + 1, pending = Dict.insert rid op model.pending }
     , FileOps.send rid cmdName args
     )
+
+
+applySaveAction : SaveState.Action -> Model -> ( Model, Cmd Msg )
+applySaveAction action model =
+    case action of
+        SaveState.NoAction ->
+            ( model, Cmd.none )
+
+        SaveState.ScheduleDebounce id delay ->
+            ( model, Process.sleep delay |> Task.perform (\_ -> DebounceFired id) )
+
+        SaveState.PerformSave _ ->
+            case ( model.vaultRoot, model.selectedPath ) of
+                ( Just root, Just path ) ->
+                    request (PWriteFile path)
+                        "write_file"
+                        [ ( "root", E.string root ), ( "path", E.string path ), ( "content", E.string model.content ) ]
+                        model
+
+                _ ->
+                    ( model, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -79,6 +105,34 @@ update msg model =
         GotFileChanged _ ->
             ( model, Cmd.none )
 
+        EditorChanged newText ->
+            let
+                ( ss, action ) =
+                    SaveState.textChanged 1000 model.saveState
+
+                reparsed =
+                    if model.language == Just Language.Scripta then
+                        Maybe.map (\d -> Scripta.reparse (Render.options model.isLight model.contentWidth) d newText) model.parsedDoc
+
+                    else
+                        model.parsedDoc
+            in
+            applySaveAction action { model | content = newText, parsedDoc = reparsed, saveState = ss }
+
+        DebounceFired firedId ->
+            let
+                ( ss, action ) =
+                    SaveState.debounceFired firedId model.saveState
+            in
+            applySaveAction action { model | saveState = ss }
+
+        GotSaveResult _ ->
+            let
+                ( ss, action ) =
+                    SaveState.saveSucceeded model.saveState
+            in
+            applySaveAction action { model | saveState = ss }
+
         GotFsResponse value ->
             case D.decodeValue FileOps.responseDecoder value of
                 Err e ->
@@ -97,7 +151,7 @@ handleResponse : PendingOp -> FileOps.FsResponse -> Model -> ( Model, Cmd Msg )
 handleResponse op resp model =
     case FileOps.resultOf resp of
         Err e ->
-            ( { model | error = Just e }, Cmd.none )
+            ( { model | error = Just e, saveState = Tuple.first (SaveState.saveFailed model.saveState) }, Cmd.none )
 
         Ok result ->
             case op of
@@ -136,6 +190,9 @@ handleResponse op resp model =
 
                         Err e ->
                             ( { model | error = Just (D.errorToString e) }, Cmd.none )
+
+                PWriteFile _ ->
+                    update (GotSaveResult resp.requestId) model
 
                 _ ->
                     ( model, Cmd.none )
