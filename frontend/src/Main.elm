@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Browser
 import Dict
+import Export
 import FileOps
 import Json.Decode as D
 import Json.Encode as E
@@ -243,6 +244,32 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        ClickedExportHtml ->
+            case model.parsedDoc of
+                Just doc ->
+                    request PExportSave
+                        "export_save"
+                        [ ( "defaultName", E.string (Export.defaultName model.selectedPath ".html") )
+                        , ( "content", E.string (Export.html model.isLight model.contentWidth doc) )
+                        ]
+                        model
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        ClickedExportLatex ->
+            case model.parsedDoc of
+                Just doc ->
+                    request PExportSave
+                        "export_save"
+                        [ ( "defaultName", E.string (Export.defaultName model.selectedPath ".tex") )
+                        , ( "content", E.string (Export.latex model.isLight model.contentWidth doc) )
+                        ]
+                        model
+
+                Nothing ->
+                    ( model, Cmd.none )
+
         GotFsResponse value ->
             case D.decodeValue FileOps.responseDecoder value of
                 Err e ->
@@ -348,7 +375,8 @@ handleResponse op resp model =
                 PNoop ->
                     ( model, Cmd.none )
 
-                _ ->
+                PExportSave ->
+                    -- File was written by the native save dialog; nothing to update.
                     ( model, Cmd.none )
 
 

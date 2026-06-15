@@ -5,7 +5,7 @@ module Scripta exposing
     , Document
     , Event(..), Output
     , parse, reparse, render, compile, mapEvent
-    , exportHtml
+    , exportHtml, exportLaTeX
     )
 
 {-| Public API for the Scripta compiler.
@@ -27,7 +27,7 @@ module Scripta exposing
 
 # Static export
 
-@docs exportHtml
+@docs exportHtml, exportLaTeX
 
 -}
 
@@ -36,6 +36,7 @@ import Either
 import Html exposing (Html)
 import Parser.Forest
 import Render.Export.Html
+import Render.Export.LaTeX
 import Render.Settings
 import Render.Types
 import Scripta.Internal as Internal exposing (Document(..), Options(..))
@@ -327,4 +328,23 @@ exportHtml _ (Document data) =
     Render.Export.Html.export publicationData
         Render.Settings.defaultRenderSettings
         data.accumulator
+        data.forest
+
+
+{-| Export a parsed Document as a LaTeX source document (a single String).
+Mirrors `exportHtml` but targets LaTeX. (Added for Mac Scripta Viewer.)
+-}
+exportLaTeX : Options -> Document -> String
+exportLaTeX _ (Document data) =
+    let
+        publicationData : Render.Types.PublicationData
+        publicationData =
+            { title = ""
+            , authorList = []
+            , kind = Render.Types.DKArticle
+            , date = Either.Right ""
+            }
+    in
+    Render.Export.LaTeX.export publicationData
+        Render.Settings.defaultRenderSettings
         data.forest

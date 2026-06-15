@@ -38,6 +38,10 @@ view model =
                                 [ button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
                                 , button [ onClick ClickedChangeVault ] [ text "Change Vault" ]
                                 ]
+                           , div [ style "margin-top" "4px" ]
+                                [ button [ onClick ClickedExportHtml ] [ text "Export HTML" ]
+                                , button [ onClick ClickedExportLatex ] [ text "Export LaTeX" ]
+                                ]
                            ]
                     )
                 , Html.node "codemirror-editor"

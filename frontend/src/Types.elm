@@ -67,3 +67,5 @@ type Msg
     | ClickedRename
     | ClickedReloadExternal
     | ClickedKeepMine
+    | ClickedExportHtml
+    | ClickedExportLatex
