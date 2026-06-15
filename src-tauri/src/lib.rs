@@ -7,6 +7,7 @@ pub fn run() {
             fs_commands::list_workspace,
             fs_commands::pick_workspace,
             fs_commands::read_file,
+            fs_commands::write_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

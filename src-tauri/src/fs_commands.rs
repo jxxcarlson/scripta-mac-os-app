@@ -87,6 +87,20 @@ pub fn read_file(root: String, path: String) -> Result<FileContent, String> {
     read_file_impl(Path::new(&root), &path)
 }
 
+pub fn write_file_impl(root: &Path, rel: &str, content: &str) -> Result<u64, String> {
+    let abs = root.join(rel);
+    if let Some(parent) = abs.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&abs, content).map_err(|e| e.to_string())?;
+    Ok(mtime_ms(&abs))
+}
+
+#[tauri::command]
+pub fn write_file(root: String, path: String, content: String) -> Result<u64, String> {
+    write_file_impl(Path::new(&root), &path, &content)
+}
+
 /// Opens a native folder-picker dialog and returns the chosen path as a UTF-8 string,
 /// or `None` if the user cancels.
 ///
@@ -150,5 +164,22 @@ mod tests {
     fn read_missing_file_errors() {
         let dir = tempdir().unwrap();
         assert!(read_file_impl(dir.path(), "nope.scripta").is_err());
+    }
+
+    #[test]
+    fn writes_file_and_returns_new_mtime() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        let mt = write_file_impl(root, "a.scripta", "new content").unwrap();
+        assert!(mt > 0);
+        assert_eq!(fs::read_to_string(root.join("a.scripta")).unwrap(), "new content");
+    }
+
+    #[test]
+    fn writes_file_creating_parent_dirs() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        write_file_impl(root, "nested/deep/a.scripta", "x").unwrap();
+        assert!(root.join("nested/deep/a.scripta").exists());
     }
 }
