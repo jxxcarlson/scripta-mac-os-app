@@ -41,6 +41,7 @@ type PendingOp
     | PDelete String
     | PExportSave
     | PNoop
+    | PLaunchFile
 
 
 type Pane
@@ -68,3 +69,4 @@ type Msg
     | ClickedKeepMine
     | ClickedExportHtml
     | ClickedExportLatex
+    | GotOpenFile D.Value

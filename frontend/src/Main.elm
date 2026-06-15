@@ -30,25 +30,26 @@ main =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { vaultRoot = Nothing
-      , tree = []
-      , selectedPath = Nothing
-      , nextRequestId = 0
-      , pending = Dict.empty
-      , error = Nothing
-      , content = ""
-      , loadedContent = ""
-      , loadedMtime = 0
-      , externalConflict = False
-      , parsedDoc = Nothing
-      , language = Nothing
-      , isLight = True
-      , contentWidth = 500
-      , saveState = SaveState.init
-      , newName = ""
-      }
-    , Cmd.none
-    )
+    request PLaunchFile
+        "take_launch_file"
+        []
+        { vaultRoot = Nothing
+        , tree = []
+        , selectedPath = Nothing
+        , nextRequestId = 0
+        , pending = Dict.empty
+        , error = Nothing
+        , content = ""
+        , loadedContent = ""
+        , loadedMtime = 0
+        , externalConflict = False
+        , parsedDoc = Nothing
+        , language = Nothing
+        , isLight = True
+        , contentWidth = 500
+        , saveState = SaveState.init
+        , newName = ""
+        }
 
 
 {-| Issue an FS request, recording the pending op against its requestId.
@@ -62,6 +63,37 @@ request op cmdName args model =
     ( { model | nextRequestId = rid + 1, pending = Dict.insert rid op model.pending }
     , FileOps.send rid cmdName args
     )
+
+
+{-| Open an absolute file path: make its parent folder the vault, watch + list
+that folder, and read the file (whose workspace-relative path is its basename).
+-}
+openExternalFile : String -> Model -> ( Model, Cmd Msg )
+openExternalFile abs model =
+    let
+        parent =
+            PathUtil.parentDir abs
+
+        name =
+            PathUtil.basename abs
+
+        m0 =
+            { model
+                | vaultRoot = Just parent
+                , selectedPath = Just name
+                , language = Language.fromPath name
+            }
+
+        ( m1, c1 ) =
+            request PListWorkspace "list_workspace" [ ( "root", E.string parent ) ] m0
+
+        ( m2, c2 ) =
+            request PNoop "watch_workspace" [ ( "root", E.string parent ) ] m1
+
+        ( m3, c3 ) =
+            request (PReadFile name) "read_file" [ ( "root", E.string parent ), ( "path", E.string name ) ] m2
+    in
+    ( m3, Cmd.batch [ c1, c2, c3 ] )
 
 
 applySaveAction : SaveState.Action -> Model -> ( Model, Cmd Msg )
@@ -260,6 +292,14 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        GotOpenFile value ->
+            case D.decodeValue (D.field "path" D.string) value of
+                Ok abs ->
+                    openExternalFile abs model
+
+                Err _ ->
+                    ( model, Cmd.none )
+
         GotFsResponse value ->
             case D.decodeValue FileOps.responseDecoder value of
                 Err e ->
@@ -369,12 +409,21 @@ handleResponse op resp model =
                     -- File was written by the native save dialog; nothing to update.
                     ( model, Cmd.none )
 
+                PLaunchFile ->
+                    case D.decodeValue (D.nullable D.string) result of
+                        Ok (Just abs) ->
+                            openExternalFile abs model
+
+                        _ ->
+                            ( model, Cmd.none )
+
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.batch
         [ FileOps.fsResponse GotFsResponse
         , FileOps.fileChanged GotFileChanged
+        , FileOps.openFile GotOpenFile
         ]
 
 

@@ -1,6 +1,6 @@
 port module FileOps exposing
     ( FsResponse
-    , fsRequest, fsResponse, fileChanged
+    , fsRequest, fsResponse, fileChanged, openFile
     , scrollToElement
     , encodeRequest, responseDecoder, resultOf
     , send
@@ -22,6 +22,9 @@ port fsResponse : (E.Value -> msg) -> Sub msg
 
 
 port fileChanged : (E.Value -> msg) -> Sub msg
+
+
+port openFile : (E.Value -> msg) -> Sub msg
 
 
 port scrollToElement : String -> Cmd msg
