@@ -17,6 +17,41 @@
       html, body { margin: 0; height: 100%; }
       #app { height: 100vh; }
 
+      /* CodeMirror theme palette. The vendored editor's theme references these
+         --cm-* variables but does not define them (v4 injected them at runtime).
+         Without these, selection / sync-highlight / search-match backgrounds are
+         transparent — i.e. selection looks broken. Light-theme values: */
+      :root {
+        --cm-fg: #1a1a1a;
+        --cm-bg: #ffffff;
+        --cm-selection-bg: #b3d4fc;
+        --cm-selection-match-bg: #d7ecff;
+        --cm-sync-highlight-bg: #fff2a8;
+        --cm-search-match-bg: #ffe08a;
+        --cm-search-match-border: #e0a800;
+        --cm-search-active-bg: #ffb347;
+        --cm-matching-bracket-bg: #c8e6c9;
+        --cm-panel-bg: #f2f2f2;
+        --cm-panel-fg: #1a1a1a;
+        --cm-panel-border: #cccccc;
+        --cm-gutter-bg: #f7f7f7;
+        --cm-gutter-fg: #999999;
+        --cm-active-line-gutter-bg: #ececec;
+        --cm-fold-placeholder: #888888;
+        --cm-tooltip-bg: #ffffff;
+        --cm-syntax-arg: #6a737d;
+        --cm-syntax-block-name: #22863a;
+        --cm-syntax-block-vert: #999999;
+        --cm-syntax-bracket: #6f42c1;
+        --cm-syntax-code: #032f62;
+        --cm-syntax-deep-orange: #d2691e;
+        --cm-syntax-element-name: #005cc5;
+        --cm-syntax-heading: #b31d28;
+        --cm-syntax-list-marker: #e36209;
+        --cm-syntax-math: #6f42c1;
+        --cm-syntax-property-key: #005cc5;
+      }
+
       button, .cm-button {
         background: #3b3f45;
         color: #fff;
