@@ -1,0 +1,2057 @@
+module Render.Export.LaTeX exposing
+    ( export, exportExpr, rawExport
+    , getPublicationData
+    )
+
+{-|
+
+@docs export, exportExpr, rawExport
+
+-}
+
+import Array
+import Dict exposing (Dict)
+import ETeX.MathMacros
+import ETeX.Transform
+import Either exposing (Either(..))
+import Generic.ASTTools as ASTTools
+import Generic.BlockUtilities
+import Generic.TextMacro
+import List.Extra
+import MiniLaTeX.Util
+import Render.Data
+import Render.Export.Image
+import Render.Export.Preamble
+import Render.Export.Util
+import Render.Settings exposing (RenderSettings)
+import Render.Types
+import Render.Utility as Utility
+import RoseTree.Tree as Tree exposing (Tree(..))
+import Tools.Loop exposing (Step(..), loop)
+import V3.Types exposing (Expr(..), Expression, ExpressionBlock, Heading(..))
+
+
+counterValue : List (Tree ExpressionBlock) -> Maybe Int
+counterValue ast =
+    ast
+        |> ASTTools.getBlockArgsByName "setcounter"
+        |> List.head
+        |> Maybe.andThen String.toInt
+
+
+getPublicationData : Render.Types.PublicationData -> List (Tree ExpressionBlock) -> ( Dict String String, Render.Types.PublicationData )
+getPublicationData pdData ast =
+    let
+        titleData : Maybe ExpressionBlock
+        titleData =
+            ASTTools.getBlockByName "title" ast
+
+        --type alias PublicationData =
+        --    { title : String
+        --    , authorList : List String
+        --    , kind : DocumentKind
+        --    , date : Either Time.Posix String
+        --    }
+        --@=@publicationData:
+        --  { authorList = ["jxxcarlson"]
+        --  , date = Left (Posix 1768140009170)
+        --  , kind = DKChapter
+        --  , title = "Physics Notebook: On Optics" } id-8ab81e41-c88e-4136-9985-14ca059756fc:286:10
+        --@=@_in_export:publicationData:
+        --  { authorList = ["jxxcarlson"]
+        --  , date = Right "January 17, 2026"
+        --  , kind = DKChapter
+        --  , title = "Physics Notebook: On Optics" } id-8ab81e41-c88e-4136-9985-14ca059756fc:286:10
+        --@=@!!_frontMatter:
+        --  "\\begin{document}\n\n\\title{Physics Notebook: On Optics}\n\n\\date{}\n\n\\author{\njxxcarlson\n}\n\n\\maketitle"
+        --title =
+        --    case titleData of
+        --        Nothing ->
+        --            "Untitled"
+        --
+        --        Just expr ->
+        --            case expr.body of
+        --                Right [ Text str _ ] ->
+        --                    str
+        --
+        --                _ ->
+        --                    "Untitled"
+        -- Extract properties from title block, including the title text itself
+        properties : Dict String String
+        properties =
+            Maybe.map .properties titleData
+                |> Maybe.map (Dict.insert "title" pdData.title)
+                |> Maybe.withDefault Dict.empty
+    in
+    ( properties
+    , { title = pdData.title
+      , authorList =
+            case Dict.get "author" properties of
+                Just str ->
+                    String.split "," str
+
+                Nothing ->
+                    pdData.authorList
+      , date =
+            case Dict.get "date" properties of
+                Nothing ->
+                    pdData.date
+
+                Just dateString ->
+                    Either.Right dateString
+      , kind = pdData.kind
+      }
+    )
+
+
+{-| -}
+export : Render.Types.PublicationData -> RenderSettings -> List (Tree ExpressionBlock) -> String
+export publicationData settings_ ast =
+    let
+        titleData : Maybe ExpressionBlock
+        titleData =
+            ASTTools.getBlockByName "title" ast
+
+        title =
+            case titleData of
+                Nothing ->
+                    "Untitled"
+
+                Just expr ->
+                    case expr.body of
+                        Right [ Text str _ ] ->
+                            str
+
+                        _ ->
+                            "Untitled"
+
+        -- Extract properties from title block, including the title text itself
+        properties : Dict String String
+        properties =
+            Maybe.map .properties titleData
+                |> Maybe.map (Dict.insert "title" title)
+                |> Maybe.withDefault Dict.empty
+
+        settings =
+            { settings_ | properties = properties }
+
+        counterValue_ =
+            Dict.get "first-section" properties
+                |> Maybe.andThen String.toInt
+                |> Maybe.map (\x -> x - 1)
+
+        setTheFirstSection =
+            case counterValue_ of
+                Nothing ->
+                    ""
+
+                Just k ->
+                    "\n\\setcounter{section}{" ++ String.fromInt k ++ "}\n"
+
+        rawBlockNames =
+            ASTTools.rawBlockNames ast
+
+        expressionNames =
+            ASTTools.expressionNames ast ++ macrosInTextMacroDefinitions
+
+        textMacroDefinitions =
+            ASTTools.getVerbatimBlockValue "textmacros" ast
+
+        macrosInTextMacroDefinitions =
+            Generic.TextMacro.getTextMacroFunctionNames textMacroDefinitions
+    in
+    Render.Export.Preamble.make publicationData
+        rawBlockNames
+        expressionNames
+        ++ frontMatter publicationData ast
+        ++ setTheFirstSection
+        ++ tableofcontents properties rawBlockNames
+        ++ "\n\n"
+        ++ rawExport settings ast
+        ++ "\n\n\\clearpage\n\n"
+        ++ "\\printindex\n\n"
+        ++ "\n\n\\end{document}\n"
+
+
+frontMatter : Render.Types.PublicationData -> List (Tree ExpressionBlock) -> String
+frontMatter publicationData ast =
+    let
+        dict =
+            ASTTools.frontMatterDict ast
+
+        authors =
+            let
+                authorList : List String
+                authorList =
+                    publicationData.authorList
+            in
+            case authorList of
+                [] ->
+                    "\\author{}"
+
+                _ ->
+                    authorList
+                        |> String.join "\n\\and\n"
+                        |> (\s -> "\\author{\n" ++ s ++ "\n}")
+
+        title =
+            "\\title{" ++ publicationData.title ++ "}"
+
+        date =
+            case publicationData.date of
+                Left _ ->
+                    ""
+
+                Right str ->
+                    "\\date{" ++ str ++ "}"
+
+        setupIndex =
+            """\\makeindex[
+                          title=Index,
+                          columns=2,
+                          %% intoc     % include index in the table of contents
+                        ]"""
+    in
+    setupIndex
+        :: "\\begin{document}"
+        :: title
+        :: date
+        :: authors
+        :: "\\maketitle"
+        :: []
+        |> String.join "\n\n"
+
+
+today : String
+today =
+    "currentTime: not implemented"
+
+
+tableofcontents : Dict String String -> List String -> String
+tableofcontents properties rawBlockNames_ =
+    let
+        -- Count actual section blocks (not title blocks)
+        -- Note: In LaTeX export, level 1 sections become \title,
+        -- level 2+ become \section, \subsection, etc.
+        -- The TOC only includes \section and below, not \title
+        sectionCount =
+            List.length (List.filter (\name -> name == "section" || name == "section*") rawBlockNames_)
+
+        numberToLevel =
+            Dict.get "number-to-level" properties
+                |> Maybe.andThen String.toFloat
+                |> Maybe.withDefault 3
+
+        -- Don't show TOC if:
+        -- 1. There's only one or zero sections
+        -- 2. Numbering is completely disabled (number-to-level:0)
+        -- Note: if all sections are level 1 (rendered as \title), TOC will be empty
+        shouldShowTOC =
+            sectionCount > 1 && numberToLevel > 0
+    in
+    if shouldShowTOC then
+        "\n\n\\tableofcontents"
+
+    else
+        ""
+
+
+zeroOrSome : Maybe Int -> Int
+zeroOrSome mInt =
+    case mInt of
+        Nothing ->
+            0
+
+        Just k ->
+            k
+
+
+oneOrTwo : Maybe Int -> Int
+oneOrTwo mInt =
+    case mInt of
+        Nothing ->
+            1
+
+        Just _ ->
+            2
+
+
+{-| In a standalone MicroLaTeX document, sections correspond to sections in the
+exported document.
+
+If a document is part of a collection or "notebook", where we have
+set the section number using \\setcounter{N}, sections correspond
+to subsections IF the document is exported as a standalone document.
+
+Function shiftSection makes the adjustments needed for export.
+
+-}
+shiftSection : Int -> ExpressionBlock -> ExpressionBlock
+shiftSection delta block =
+    if Generic.BlockUtilities.getExpressionBlockName block == Just "section" then
+        case block.args of
+            level :: rest ->
+                case String.toInt level of
+                    Nothing ->
+                        block
+
+                    Just kk ->
+                        let
+                            newLevel =
+                                String.fromInt (kk + delta)
+                        in
+                        { block | args = newLevel :: rest }
+
+            _ ->
+                block
+
+    else
+        block
+
+
+{-| Prepend a line number comment to exported LaTeX if the block has a valid source line number.
+Synthetic blocks (created by the compiler) won't have valid line numbers and are skipped.
+-}
+annotateWithLineNumber : ExpressionBlock -> String -> String
+annotateWithLineNumber block output =
+    let
+        lineNumber =
+            block.meta.lineNumber
+    in
+    if lineNumber > 0 then
+        "%%% Line " ++ String.fromInt lineNumber ++ "\n" ++ output
+
+    else
+        output
+
+
+exportTree : ETeX.MathMacros.MathMacroDict -> RenderSettings -> Tree ExpressionBlock -> String
+exportTree mathMacroDict settings tree =
+    let
+        block =
+            Tree.value tree
+
+        result =
+            case block.heading of
+                Ordinary "itemList" ->
+                    let
+                        exprList : List Expression
+                        exprList =
+                            case block.body of
+                                Left _ ->
+                                    []
+
+                                Right exprs ->
+                                    exprs
+
+                        compactItem x =
+                            "\\compactItem{" ++ x ++ "}"
+
+                        renderExprList : List Expression -> String
+                        renderExprList exprs =
+                            List.map (exportExpr mathMacroDict settings >> compactItem) exprs |> String.join "\n"
+                    in
+                    renderExprList exprList
+
+                Ordinary "numberedList" ->
+                    let
+                        label : Int -> String
+                        label n =
+                            String.fromInt (n + 1) ++ ". "
+
+                        hang str =
+                            "\\leftskip=1em\\hangindent=1em\n\\hangafter=1\n" ++ str
+
+                        exprList : List Expression
+                        exprList =
+                            case block.body of
+                                Left _ ->
+                                    []
+
+                                Right exprs ->
+                                    exprs
+
+                        renderExprList : List Expression -> String
+                        renderExprList exprs =
+                            List.indexedMap (\k -> exportExpr mathMacroDict settings >> (\x -> label k ++ hang x)) exprs |> String.join "\n\n"
+                    in
+                    renderExprList exprList
+
+                _ ->
+                    case Tree.children tree of
+                        [] ->
+                            exportBlock mathMacroDict settings block
+
+                        children ->
+                            -- Special handling for item blocks with nested list children
+                            case Generic.BlockUtilities.getExpressionBlockName block of
+                                Just "item" ->
+                                    handleItemWithChildren mathMacroDict settings tree children
+
+                                Just "numbered" ->
+                                    handleItemWithChildren mathMacroDict settings tree children
+
+                                _ ->
+                                    -- Default behavior for other blocks with children
+                                    let
+                                        renderedChildren : List String
+                                        renderedChildren =
+                                            List.map (exportTree mathMacroDict settings) children
+                                                |> List.map String.lines
+                                                |> List.concat
+
+                                        root : List String
+                                        root =
+                                            exportBlock mathMacroDict settings block |> String.lines
+                                    in
+                                    case List.Extra.unconsLast root of
+                                        Nothing ->
+                                            ""
+
+                                        Just ( lastLine, firstLines ) ->
+                                            let
+                                                _ =
+                                                    firstLines
+
+                                                _ =
+                                                    renderedChildren
+
+                                                _ =
+                                                    lastLine
+                                            in
+                                            firstLines ++ renderedChildren ++ [ lastLine ] |> String.join "\n"
+    in
+    annotateWithLineNumber block result
+
+
+handleItemWithChildren : ETeX.MathMacros.MathMacroDict -> RenderSettings -> Tree ExpressionBlock -> List (Tree ExpressionBlock) -> String
+handleItemWithChildren mathMacroDict settings tree children =
+    let
+        -- Export the item content
+        itemContent =
+            exportBlock mathMacroDict settings (Tree.value tree)
+
+        -- Check if first child is a beginBlock (nested list)
+        firstChildIsBeginBlock =
+            List.head children
+                |> Maybe.map Tree.value
+                |> Maybe.andThen Generic.BlockUtilities.getExpressionBlockName
+                |> Maybe.map (\name -> name == "beginBlock" || name == "beginNumberedBlock")
+                |> Maybe.withDefault False
+    in
+    if firstChildIsBeginBlock then
+        -- Nested list case: export item, then children with indentation
+        let
+            childrenOutput =
+                List.map (exportTree mathMacroDict settings) children
+                    |> String.join "\n"
+                    |> indentNestedList
+        in
+        itemContent ++ "\n" ++ childrenOutput
+
+    else
+        -- No nested list: just concatenate
+        itemContent ++ "\n" ++ (List.map (exportTree mathMacroDict settings) children |> String.join "\n")
+
+
+indentNestedList : String -> String
+indentNestedList str =
+    str
+        |> String.lines
+        |> List.map (\line -> "  " ++ line)
+        |> String.join "\n"
+
+
+{-| -}
+rawExport : RenderSettings -> List (Tree ExpressionBlock) -> String
+rawExport settings ast_ =
+    let
+        -- mathMacroDict : Dict String ETeX.Transform.MacroBody
+        mathMacroDict =
+            ast_
+                |> ASTTools.getVerbatimBlockValue "mathmacros"
+                |> ETeX.Transform.makeMacroDict
+
+        mathMacroBlock_ : Maybe ExpressionBlock
+        mathMacroBlock_ =
+            ASTTools.getBlockByName "mathmacros" ast_
+
+        hideMathMacros : Tree ExpressionBlock -> Tree ExpressionBlock
+        hideMathMacros (Tree val children) =
+            let
+                outputTree =
+                    case val.heading of
+                        Paragraph ->
+                            Tree val children
+
+                        Ordinary _ ->
+                            Tree val children
+
+                        Verbatim "mathmacros" ->
+                            Tree { val | heading = Verbatim "hide" } children
+
+                        Verbatim _ ->
+                            Tree val children
+            in
+            outputTree
+
+        ast =
+            case mathMacroBlock_ of
+                Nothing ->
+                    ast_
+
+                Just mathMacroBlock ->
+                    Tree.leaf mathMacroBlock :: List.map (Tree.map hideMathMacros) ast_
+    in
+    let
+        processedTrees =
+            ast
+                |> ASTTools.filterForestOnLabelNames (\name -> not (name == Just "runninghead"))
+                |> List.map (Tree.mapValues Generic.BlockUtilities.condenseUrls)
+                |> encloseLists
+
+        exportedStrings =
+            processedTrees
+                |> List.map (exportTree mathMacroDict settings)
+    in
+    smartJoin exportedStrings
+
+
+{-| Join exported strings intelligently:
+
+  - All elements use double newlines (one empty line) for proper LaTeX formatting
+  - This ensures proper spacing after \\begin{itemize}, \\item, \\end{itemize}, etc.
+
+-}
+smartJoin : List String -> String
+smartJoin strings =
+    String.join "\n\n" strings
+
+
+type Status
+    = InsideItemizedList
+    | InsideNumberedList
+    | InsideDescriptionList
+    | InsideBibliography
+    | OutsideList
+
+
+encloseLists : List (Tree ExpressionBlock) -> List (Tree ExpressionBlock)
+encloseLists blocks =
+    -- First, recursively process children of each tree
+    let
+        processedBlocks =
+            List.map processTreeChildren blocks
+    in
+    -- Then wrap consecutive items at this level
+    loop { status = OutsideList, input = processedBlocks, output = [], itemNumber = 0 } nextStep |> List.reverse
+
+
+{-| Recursively process children of a tree to enclose nested lists
+-}
+processTreeChildren : Tree ExpressionBlock -> Tree ExpressionBlock
+processTreeChildren (Tree block children) =
+    let
+        childList =
+            Array.toList children
+
+        processedChildren =
+            case childList of
+                [] ->
+                    Array.empty
+
+                _ ->
+                    -- Recursively process children and wrap them in begin/end blocks if needed
+                    encloseLists childList |> Array.fromList
+    in
+    Tree block processedChildren
+
+
+type alias State =
+    { status : Status, input : List (Tree ExpressionBlock), output : List (Tree ExpressionBlock), itemNumber : Int }
+
+
+nextStep : State -> Step State (List (Tree ExpressionBlock))
+nextStep state =
+    case List.head state.input of
+        Nothing ->
+            -- When input is exhausted, close any open lists
+            case state.status of
+                InsideItemizedList ->
+                    Done (Tree.leaf endItemizedBlock :: state.output)
+
+                InsideNumberedList ->
+                    Done (Tree.leaf endNumberedBlock :: state.output)
+
+                InsideDescriptionList ->
+                    Done (Tree.leaf endDescriptionBlock :: state.output)
+
+                InsideBibliography ->
+                    Done (Tree.leaf endBibliographyBlock :: state.output)
+
+                OutsideList ->
+                    Done state.output
+
+        Just tree ->
+            Loop (nextState tree state)
+
+
+emptyExpressionBlock : ExpressionBlock
+emptyExpressionBlock =
+    { heading = Paragraph
+    , indent = 0
+    , args = []
+    , properties = Dict.empty
+    , firstLine = ""
+    , body = Right []
+    , meta =
+        { id = ""
+        , position = 0
+        , lineNumber = 0
+        , bodyLineNumber = 0
+        , numberOfLines = 0
+        , begin = 0
+        , end = 0
+        , contentBegin = 0
+        , contentEnd = 0
+        , messages = []
+        , sourceText = ""
+        , error = Nothing
+        }
+    , style = {}
+    }
+
+
+beginItemizedBlock : ExpressionBlock
+beginItemizedBlock =
+    { emptyExpressionBlock
+        | indent = 1
+        , heading = Ordinary "beginBlock"
+        , body = Right [ Text "itemize" { begin = 0, end = 7, index = 0, id = "" } ]
+    }
+        |> Generic.BlockUtilities.updateMeta
+            (\m ->
+                { m
+                    | sourceText = "| beginBlock\nitemize"
+                    , numberOfLines = 2
+                }
+            )
+
+
+endItemizedBlock : ExpressionBlock
+endItemizedBlock =
+    { emptyExpressionBlock
+        | indent = 1
+        , heading = Ordinary "endBlock"
+        , body = Right [ Text "itemize" { begin = 0, end = 7, index = 0, id = "end" } ]
+    }
+        |> Generic.BlockUtilities.updateMeta
+            (\m ->
+                { m
+                    | sourceText = "| endBlock\nitemize"
+                    , numberOfLines = 2
+                }
+            )
+
+
+beginNumberedBlock : ExpressionBlock
+beginNumberedBlock =
+    { emptyExpressionBlock
+        | indent = 1
+        , heading = Ordinary "beginNumberedBlock"
+        , body = Right [ Text "enumerate" { begin = 0, end = 7, index = 0, id = "begin" } ]
+    }
+        |> Generic.BlockUtilities.updateMeta
+            (\m ->
+                { m
+                    | sourceText = "| beginBlock\nitemize"
+                    , numberOfLines = 2
+                }
+            )
+
+
+endNumberedBlock : ExpressionBlock
+endNumberedBlock =
+    { emptyExpressionBlock
+        | indent = 1
+        , heading = Ordinary "endNumberedBlock"
+        , body = Right [ Text "enumerate" { begin = 0, end = 7, index = 0, id = "begin" } ]
+    }
+        |> Generic.BlockUtilities.updateMeta
+            (\m ->
+                { m
+                    | sourceText = "| endBlock\nitemize"
+                    , numberOfLines = 2
+                }
+            )
+
+
+beginDescriptionBlock : ExpressionBlock
+beginDescriptionBlock =
+    { emptyExpressionBlock
+        | indent = 1
+        , heading = Ordinary "beginDescriptionBlock"
+        , body = Right [ Text "description" { begin = 0, end = 7, index = 0, id = "begin" } ]
+    }
+        |> Generic.BlockUtilities.updateMeta
+            (\m ->
+                { m
+                    | sourceText = "| beginBlock\ndescription"
+                    , numberOfLines = 2
+                }
+            )
+
+
+endDescriptionBlock : ExpressionBlock
+endDescriptionBlock =
+    { emptyExpressionBlock
+        | indent = 1
+        , heading = Ordinary "endDescriptionBlock"
+        , body = Right [ Text "description" { begin = 0, end = 7, index = 0, id = "end" } ]
+    }
+        |> Generic.BlockUtilities.updateMeta
+            (\m ->
+                { m
+                    | sourceText = "| endBlock\ndescription"
+                    , numberOfLines = 2
+                }
+            )
+
+
+beginBibliographyBlock : List String -> ExpressionBlock
+beginBibliographyBlock args =
+    let
+        maxWidth =
+            List.head args |> Maybe.withDefault "9"
+    in
+    { emptyExpressionBlock
+        | heading = Ordinary "beginBibliographyBlock"
+        , args = args
+        , body = Right [ Text maxWidth { begin = 0, end = 1, index = 0, id = "begin" } ]
+    }
+
+
+endBibliographyBlock : ExpressionBlock
+endBibliographyBlock =
+    { emptyExpressionBlock
+        | heading = Ordinary "endBibliographyBlock"
+    }
+
+
+nextState : Tree ExpressionBlock -> State -> State
+nextState tree state =
+    let
+        name_ =
+            Tree.value tree |> Generic.BlockUtilities.getExpressionBlockName
+    in
+    case ( state.status, name_ ) of
+        -- ITEMIZED LIST
+        ( OutsideList, Just "item" ) ->
+            { state | status = InsideItemizedList, itemNumber = 1, output = tree :: Tree.leaf beginItemizedBlock :: state.output, input = List.drop 1 state.input }
+
+        ( InsideItemizedList, Just "item" ) ->
+            { state | output = tree :: state.output, itemNumber = state.itemNumber + 1, input = List.drop 1 state.input }
+
+        ( InsideItemizedList, _ ) ->
+            { state | status = OutsideList, itemNumber = 0, output = tree :: Tree.leaf endItemizedBlock :: state.output, input = List.drop 1 state.input }
+
+        -- NUMBERED LIST
+        ( OutsideList, Just "numbered" ) ->
+            { state | status = InsideNumberedList, itemNumber = 1, output = tree :: Tree.leaf beginNumberedBlock :: state.output, input = List.drop 1 state.input }
+
+        ( InsideNumberedList, Just "numbered" ) ->
+            { state | output = tree :: state.output, itemNumber = state.itemNumber + 1, input = List.drop 1 state.input }
+
+        ( InsideNumberedList, _ ) ->
+            { state | status = OutsideList, itemNumber = 0, output = tree :: Tree.leaf endNumberedBlock :: state.output, input = List.drop 1 state.input }
+
+        -- DESCRIPTION LIST
+        ( OutsideList, Just "desc" ) ->
+            { state | status = InsideDescriptionList, itemNumber = 1, output = tree :: Tree.leaf beginDescriptionBlock :: state.output, input = List.drop 1 state.input }
+
+        ( InsideDescriptionList, Just "desc" ) ->
+            { state | output = tree :: state.output, itemNumber = state.itemNumber + 1, input = List.drop 1 state.input }
+
+        ( InsideDescriptionList, _ ) ->
+            { state | status = OutsideList, itemNumber = 0, output = tree :: Tree.leaf endDescriptionBlock :: state.output, input = List.drop 1 state.input }
+
+        -- BIBLIOGRAPHY
+        ( OutsideList, Just "bibliography" ) ->
+            let
+                args =
+                    (Tree.value tree).args
+            in
+            { state | status = InsideBibliography, output = Tree.leaf (beginBibliographyBlock args) :: state.output, input = List.drop 1 state.input }
+
+        ( InsideBibliography, Just "bibitem" ) ->
+            { state | output = tree :: state.output, input = List.drop 1 state.input }
+
+        ( InsideBibliography, _ ) ->
+            { state | status = OutsideList, output = tree :: Tree.leaf endBibliographyBlock :: state.output, input = List.drop 1 state.input }
+
+        --- OUTSIDE
+        ( OutsideList, _ ) ->
+            { state | output = tree :: state.output, input = List.drop 1 state.input }
+
+
+exportBlock : ETeX.MathMacros.MathMacroDict -> RenderSettings -> ExpressionBlock -> String
+exportBlock mathMacroDict settings block =
+    case block.heading of
+        Paragraph ->
+            case block.body of
+                Left str ->
+                    mapChars2 str
+
+                Right exprs_ ->
+                    exportExprList mathMacroDict settings exprs_
+
+        Ordinary "table" ->
+            case block.body of
+                Left str ->
+                    str
+
+                Right exprs_ ->
+                    case List.head exprs_ of
+                        Just (Fun "table" body _) ->
+                            let
+                                renderRow : Expression -> List Expression
+                                renderRow rowExpr =
+                                    case rowExpr of
+                                        Fun "row" cells _ ->
+                                            cells
+
+                                        _ ->
+                                            []
+
+                                cellTable : List (List Expression)
+                                cellTable =
+                                    List.map renderRow body
+
+                                stringTable : List (List String)
+                                stringTable =
+                                    cellTable |> List.map (List.map exportCell)
+
+                                exportCell : Expression -> String
+                                exportCell expr =
+                                    case expr of
+                                        Fun "cell" exprs2 _ ->
+                                            exportExprList mathMacroDict settings exprs2
+
+                                        _ ->
+                                            "error constructing table cell"
+
+                                makeRow : List String -> String
+                                makeRow row =
+                                    row |> String.join "& "
+
+                                output =
+                                    List.map makeRow stringTable |> String.join " \\\\\n"
+
+                                columns =
+                                    List.length (List.Extra.transpose stringTable)
+
+                                defaultFormat =
+                                    List.repeat columns "l"
+                                        |> String.join " "
+                                        |> (\x -> "{" ++ x ++ "}")
+
+                                format =
+                                    Dict.get "format" block.properties |> Maybe.withDefault defaultFormat
+                            in
+                            "\\begin{tabular}" ++ format ++ "\n" ++ output ++ "\n\\end{tabular}"
+
+                        _ ->
+                            "error in constructing table"
+
+        Ordinary "box" ->
+            case block.body of
+                Left _ ->
+                    ""
+
+                Right exprs_ ->
+                    exportBox block.properties block.args (exportExprList mathMacroDict settings exprs_)
+
+        Ordinary name ->
+            case block.body of
+                Left _ ->
+                    ""
+
+                Right exprs_ ->
+                    case Dict.get name (blockDict mathMacroDict) of
+                        Just f ->
+                            f settings block.args (exportExprList mathMacroDict settings exprs_)
+
+                        Nothing ->
+                            environment name (exportExprList mathMacroDict settings exprs_)
+
+        Verbatim name ->
+            case block.body of
+                Left str ->
+                    case name of
+                        "math" ->
+                            let
+                                maybeLabel : Maybe String
+                                maybeLabel =
+                                    Dict.get "label" block.properties |> Maybe.map (\l -> "\\label{" ++ String.trim l ++ "}")
+
+                                fix_ : String -> String
+                                fix_ str_ =
+                                    str_
+                                        |> String.lines
+                                        |> List.filter (\line -> String.left 2 line /= "$$")
+                                        |> String.join "\n"
+                                        |> ETeX.Transform.transformETeX mathMacroDict
+                                        |> MiniLaTeX.Util.transformLabel
+
+                                isAlignedBlock =
+                                    String.contains "&" str
+                            in
+                            if isAlignedBlock then
+                                processAlignedBlock block str mathMacroDict
+
+                            else
+                                case maybeLabel of
+                                    Nothing ->
+                                        [ "\\begin{equation}", fix_ str, "\\end{equation}" ] |> String.join "\n"
+
+                                    Just label ->
+                                        [ "\\begin{equation}", label, fix_ str, "\\end{equation}" ] |> String.join "\n"
+
+                        "csvtable" ->
+                            let
+                                data =
+                                    Render.Data.prepareTable 1 block
+
+                                renderRow : Int -> List Int -> List String -> String
+                                renderRow rowNumber widths_ rowOfCells =
+                                    if rowNumber == 0 then
+                                        List.map2 (\cell width -> String.padRight width ' ' cell) rowOfCells widths_
+                                            |> String.join " "
+                                            |> String.replace "_" " "
+
+                                    else
+                                        List.map2 (\cell width -> String.padRight width ' ' cell) rowOfCells widths_ |> String.join " "
+
+                                renderedRows =
+                                    List.indexedMap (\rowNumber -> renderRow rowNumber data.columnWidths) data.selectedCells |> String.join "\n"
+                            in
+                            case data.title of
+                                Nothing ->
+                                    [ "\\begin{verbatim}", renderedRows, "\\end{verbatim}" ] |> String.join "\n"
+
+                                Just title ->
+                                    let
+                                        separator =
+                                            String.repeat data.totalWidth "-"
+                                    in
+                                    [ "\\begin{verbatim}", title, separator, renderedRows, "\\end{verbatim}" ] |> String.join "\n"
+
+                        "equation" ->
+                            let
+                                maybeLabel : Maybe String
+                                maybeLabel =
+                                    Dict.get "label" block.properties |> Maybe.map (\l -> "\\label{" ++ String.trim l ++ "}")
+
+                                isAlignedBlock =
+                                    String.contains "&" str
+                            in
+                            if isAlignedBlock then
+                                processAlignedBlock block str mathMacroDict
+
+                            else
+                                case maybeLabel of
+                                    Nothing ->
+                                        [ "\\begin{equation}", str |> ETeX.Transform.transformETeX mathMacroDict |> MiniLaTeX.Util.transformLabel, "\\end{equation}" ] |> String.join "\n"
+
+                                    Just label ->
+                                        [ "\\begin{equation}", label, str |> ETeX.Transform.transformETeX mathMacroDict |> MiniLaTeX.Util.transformLabel, "\\end{equation}" ] |> String.join "\n"
+
+                        "aligned" ->
+                            -- TODO: equation numbers and label
+                            let
+                                maybeLabel : Maybe String
+                                maybeLabel =
+                                    Dict.get "label" block.properties |> Maybe.map (\l -> "\\label{" ++ String.trim l ++ "}")
+
+                                -- Strip trailing \\ from a line if present
+                                stripTrailingBackslashes : String -> String
+                                stripTrailingBackslashes line =
+                                    if String.endsWith "\\\\" line then
+                                        String.dropRight 2 line |> String.trimRight
+
+                                    else
+                                        line
+
+                                -- Process each line separately and add \\ line breaks
+                                lines =
+                                    str
+                                        |> String.lines
+                                        |> List.map String.trim
+                                        |> List.filter (\line -> not (String.isEmpty line))
+                                        |> List.map stripTrailingBackslashes
+                                        |> List.map (ETeX.Transform.transformETeX mathMacroDict)
+                                        |> List.map MiniLaTeX.Util.transformLabel
+
+                                -- Add \\ to the end of all lines except the last
+                                processedLines =
+                                    case List.reverse lines of
+                                        [] ->
+                                            ""
+
+                                        lastLine :: restReversed ->
+                                            (List.reverse restReversed |> List.map (\line -> line ++ "\\\\"))
+                                                ++ [ lastLine ]
+                                                |> String.join "\n"
+                            in
+                            case maybeLabel of
+                                Nothing ->
+                                    [ "\\begin{align}", processedLines, "\\end{align}" ] |> String.join "\n"
+
+                                Just label ->
+                                    [ "\\begin{align}", label, processedLines, "\\end{align}" ] |> String.join "\n"
+
+                        "code" ->
+                            str |> fixChars |> (\s -> "\\begin{verbatim}\n" ++ s ++ "\n\\end{verbatim}")
+
+                        "tabular" ->
+                            str |> fixChars |> (\s -> "\\begin{tabular}{" ++ String.join " " block.args ++ "}\n" ++ s ++ "\n\\end{tabular}")
+
+                        "verbatim" ->
+                            str |> fixChars |> (\s -> "\\begin{verbatim}\n" ++ s ++ "\n\\end{verbatim}")
+
+                        "verse" ->
+                            str |> fixChars |> (\s -> "\\begin{verbatim}\n" ++ s ++ "\n\\end{verbatim}")
+
+                        "chem" ->
+                            "\\[\\ce{" ++ str ++ "}\\]"
+
+                        "load-files" ->
+                            ""
+
+                        "mathmacros" ->
+                            str |> ETeX.Transform.toLaTeXNewCommands
+
+                        "texComment" ->
+                            str |> String.lines |> texComment
+
+                        "textmacros" ->
+                            Generic.TextMacro.exportTexMacros str
+
+                        "image" ->
+                            Render.Export.Image.exportBlock settings block
+
+                        "quiver" ->
+                            let
+                                lines =
+                                    String.split "---" str
+                                        |> List.drop 1
+                                        |> String.join "\n"
+                                        |> String.lines
+                                        |> List.filter (\line -> line /= "")
+
+                                line1 =
+                                    List.head lines |> Maybe.withDefault "%%" |> String.trim
+
+                                line1b =
+                                    if String.contains "\\hide{" line1 then
+                                        -- preserve comment with quiver url
+                                        line1 |> String.replace "\\hide{" "" |> String.dropRight 1 |> (\x -> "%% " ++ x)
+
+                                    else
+                                        line1
+
+                                data =
+                                    lines
+                                        |> List.drop 1
+                                        -- now normalize the data
+                                        |> List.filter (\line -> not <| String.contains "\\[\\begin{tikzcd}" line)
+                                        |> List.filter (\line -> not <| String.contains "\\end{tikzcd}" line)
+                                        |> (\x -> line1b :: "\\[\\begin{tikzcd}" :: x ++ [ "\\end{tikzcd}\\]" ])
+                                        |> String.join "\n"
+                            in
+                            data
+
+                        "tikz" ->
+                            let
+                                renderedAsLaTeX =
+                                    String.contains "\\hide{" str
+
+                                data =
+                                    String.split "---" str
+                                        |> List.drop 1
+                                        |> String.join ""
+                                        |> String.lines
+                                        |> List.map (hideToPercentComment >> commentBlankLine)
+                                        |> String.join "\n"
+                                        |> addTikzPictureClosing renderedAsLaTeX
+                            in
+                            [ "\\[\n", data, "\n\\]" ]
+                                |> String.join ""
+
+                        "docinfo" ->
+                            ""
+
+                        "hide" ->
+                            ""
+
+                        _ ->
+                            "%%% export of this block is unimplemented"
+
+                Right _ ->
+                    "???(13)"
+
+
+addTikzPictureClosing flagUp str =
+    if flagUp then
+        str ++ "\n\\end{tikzpicture}"
+
+    else
+        str
+
+
+processAlignedBlock : { a | properties : Dict String String } -> String -> ETeX.MathMacros.MathMacroDict -> String
+processAlignedBlock block str mathMacroDict =
+    let
+        maybeLabel : Maybe String
+        maybeLabel =
+            Dict.get "label" block.properties |> Maybe.map (\l -> "\\label{" ++ String.trim l ++ "}")
+
+        -- Strip trailing \\ from a line if present
+        stripTrailingBackslashes : String -> String
+        stripTrailingBackslashes line =
+            if String.endsWith "\\\\" line then
+                String.dropRight 2 line |> String.trimRight
+
+            else
+                line
+
+        -- Process each line separately and add \\ line breaks
+        lines =
+            str
+                |> String.lines
+                |> List.map String.trim
+                |> List.filter (\line -> not (String.isEmpty line))
+                |> List.map stripTrailingBackslashes
+                |> List.map (ETeX.Transform.transformETeX mathMacroDict)
+                |> List.map MiniLaTeX.Util.transformLabel
+
+        -- Add \\ to the end of all lines except the last
+        processedLines =
+            case List.reverse lines of
+                [] ->
+                    ""
+
+                lastLine :: restReversed ->
+                    (List.reverse restReversed |> List.map (\line -> line ++ "\\\\"))
+                        ++ [ lastLine ]
+                        |> String.join "\n"
+    in
+    case maybeLabel of
+        Nothing ->
+            [ "\\begin{align}", processedLines, "\\end{align}" ] |> String.join "\n"
+
+        Just label ->
+            [ "\\begin{align}", label, processedLines, "\\end{align}" ] |> String.join "\n"
+
+
+commentBlankLine : String -> String
+commentBlankLine line =
+    if line == "" then
+        "%"
+
+    else
+        line
+
+
+hideToPercentComment : String -> String
+hideToPercentComment str =
+    if String.left 6 str == "\\hide{" then
+        str |> String.dropLeft 6 |> String.dropRight 1 |> (\s -> "%% " ++ s)
+
+    else
+        str
+
+
+fixChars str =
+    str |> String.replace "{" "\\{" |> String.replace "}" "\\}"
+
+
+renderDefs : ETeX.MathMacros.MathMacroDict -> RenderSettings -> List Expression -> String
+renderDefs mathMacroDict settings exprs =
+    "%% Macro definitions from Markup text:\n"
+        ++ exportExprList mathMacroDict settings exprs
+
+
+mapChars1 : String -> String
+mapChars1 str =
+    str
+        |> String.replace "\\term_" "\\termx"
+
+
+mapChars2 : String -> String
+mapChars2 str =
+    str
+        |> String.replace "_" "\\_"
+        |> String.replace "“" "``"
+        |> String.replace "”" "''"
+        |> String.replace "‘" "`"
+        |> String.replace "’" "'"
+        |> String.replace "–" "--"
+        |> String.replace "—" "---"
+
+
+
+-- BEGIN DICTIONARIES
+
+
+{-|
+
+    Translate Scripta names to LaTeX names.
+
+-}
+functionDict : Dict String String
+functionDict =
+    Dict.fromList
+        [ ( "italic", "textit" )
+        , ( "i", "textit" )
+        , ( "bold", "textbf" )
+        , ( "b", "textbf" )
+        , ( "image", "imagecenter" )
+        , ( "contents", "tableofcontents" )
+        , ( "term", "index" )
+        ]
+
+
+
+-- MACRODICT
+
+
+macroDict : Dict String (RenderSettings -> List Expression -> String)
+macroDict =
+    Dict.fromList
+        [ ( "link", \_ -> link )
+        , ( "ilink", \_ -> ilink )
+        , ( "wikilink", \_ -> wikilink )
+        , ( "mark", \_ -> markwith )
+        , ( "par", \_ -> par )
+        , ( "eqref", \_ -> eqref )
+        , ( "mathref", \_ -> eqref )
+        , ( "index", \_ -> index )
+        , ( "index_", \_ _ -> blindIndex )
+        , ( "image", Render.Export.Image.export )
+        , ( "vspace", \_ -> vspace )
+        , ( "bolditalic", \_ -> bolditalic )
+        , ( "brackets", \_ -> brackets )
+        , ( "lb", \_ -> lb )
+        , ( "rb", \_ -> rb )
+        , ( "bt", \_ -> bt )
+        , ( "underscore", \_ -> underscore )
+        , ( "qed", \_ _ -> "\\hfill$\\square$" )
+        , ( "tags", dontRender )
+        , ( "setcounter", dontRender )
+        , ( "abstract", \_ -> abstractInline )
+        , ( "bibitem", \_ exprs -> "[" ++ (Render.Export.Util.getArgs exprs |> String.join " ") ++ "]" )
+        , ( "cite", \_ -> exportCite )
+        , ( "box", \_ _ -> "$\\square$" )
+        , ( "cbox", \_ _ -> "$\\boxtimes$" )
+        , ( "rbox", \_ _ -> "\\textcolor{red}{$\\square$}" )
+        , ( "crbox", \_ _ -> "\\textcolor{red}{$\\boxtimes$}" )
+        , ( "fbox", \_ _ -> "$\\blacksquare$" )
+        , ( "frbox", \_ _ -> "\\textcolor{red}{$\\blacksquare$}" )
+        , ( "xbox", \_ _ -> "$\\boxtimes$" )
+        , ( "errorHighlight", \_ -> errorHighlight )
+        ]
+
+
+dontRender : RenderSettings -> List Expression -> String
+dontRender _ _ =
+    ""
+
+
+{-| Inline `[abstract ...]`. The bare `\abstract` token is the article class's
+abstract environment, so emit a plain labelled run of text instead.
+-}
+abstractInline : List Expression -> String
+abstractInline exprs =
+    "\\textbf{Abstract.} " ++ (Render.Export.Util.getArgs exprs |> String.join " ")
+
+
+errorHighlight : List Expression -> String
+errorHighlight exprs =
+    let
+        content =
+            List.map exprToString exprs |> String.join ""
+
+        exprToString expr =
+            case expr of
+                Text str _ ->
+                    str
+
+                VFun _ body _ ->
+                    body
+
+                _ ->
+                    "?"
+    in
+    "\\textcolor{red}{[" ++ content ++ "]}"
+
+
+exportCite : List Expression -> String
+exportCite exprs =
+    case exprs of
+        [ Text key _ ] ->
+            "\\cite{" ++ String.trim key ++ "}"
+
+        _ ->
+            ""
+
+
+exportBox : Dict String String -> List String -> String -> String
+exportBox properties args body =
+    let
+        title =
+            case Dict.get "title" properties of
+                Just t ->
+                    t
+
+                Nothing ->
+                    String.join " " args
+
+        options =
+            [ "colback=blue!5!white", "boxrule=0.25pt", "left=1cm", "right=1cm" ]
+                ++ (if title == "" then
+                        []
+
+                    else
+                        [ "title={" ++ title ++ "}", "coltitle=black", "colbacktitle=blue!10!white" ]
+                   )
+    in
+    "\\begin{tcolorbox}[" ++ String.join ", " options ++ "]\n" ++ body ++ "\n\\end{tcolorbox}"
+
+
+exportBibliographyBegin : List String -> String
+exportBibliographyBegin args =
+    let
+        maxWidth =
+            List.head args |> Maybe.withDefault "9"
+    in
+    "\\section{References}\n\\renewcommand{\\refname}{}\\vspace{-1.5em}\n\\begin{thebibliography}{" ++ maxWidth ++ "}"
+
+
+exportBibitem : List String -> String -> String
+exportBibitem args body =
+    let
+        key =
+            List.head args |> Maybe.withDefault ""
+    in
+    "\\bibitem{" ++ key ++ "}\n" ++ body
+
+
+
+-- BLOCKDICT
+
+
+blockDict : ETeX.MathMacros.MathMacroDict -> Dict String (RenderSettings -> List String -> String -> String)
+blockDict mathMacroDict =
+    Dict.fromList
+        [ ( "title", \_ _ _ -> "" )
+        , ( "subtitle", \_ _ _ -> "" )
+        , ( "author", \_ _ _ -> "" )
+        , ( "date", \_ _ _ -> "" )
+        , ( "contents", \_ _ _ -> "" )
+        , ( "hide", \_ _ _ -> "" )
+        , ( "texComment", \_ lines _ -> texComment lines )
+        , ( "tags", \_ _ _ -> "" )
+        , ( "docinfo", \_ _ _ -> "" )
+        , ( "banner", \_ _ _ -> "" )
+        , ( "set-key", \_ _ _ -> "" )
+        , ( "endnotes", \_ _ _ -> "" )
+        , ( "index", \_ _ _ -> "" )
+        , ( "references", \_ _ _ -> "" )
+
+        --
+        , ( "chapter", \settings_ args body -> chapter settings_ args body )
+        , ( "section", \settings_ args body -> section settings_ args body )
+        , ( "subheading", \settings_ args body -> subheading settings_ args body )
+        , ( "smallsubheading", \settings_ args body -> smallsubheading settings_ args body )
+        , ( "item", \_ _ body -> "\\item " ++ body )
+        , ( "itemList", \_ _ body -> body )
+        , ( "descriptionItem", \_ args body -> descriptionItem args body )
+        , ( "numbered", \_ _ body -> "\\item " ++ body )
+        , ( "desc", \_ args body -> descriptionItem args body )
+        , ( "beginBlock", \_ _ _ -> "\\begin{itemize}" )
+        , ( "endBlock", \_ _ _ -> "\\end{itemize}" )
+        , ( "beginNumberedBlock", \_ _ _ -> "\\begin{enumerate}" )
+        , ( "endNumberedBlock", \_ _ _ -> "\\end{enumerate}" )
+        , ( "beginDescriptionBlock", \_ _ _ -> "\\begin{description}" )
+        , ( "endDescriptionBlock", \_ _ _ -> "\\end{description}" )
+        , ( "mathmacros", \_ _ body -> body |> ETeX.Transform.toLaTeXNewCommands )
+        , ( "setcounter", \_ _ _ -> "" )
+        , ( "bibliography", \_ _ _ -> "" )
+        , ( "bibitem", \_ args body -> exportBibitem args body )
+        , ( "beginBibliographyBlock", \_ args _ -> exportBibliographyBegin args )
+        , ( "endBibliographyBlock", \_ _ _ -> "\\end{thebibliography}" )
+
+        -- Configuration blocks: no visible output
+        , ( "collection", \_ _ _ -> "" )
+        , ( "document", \_ _ _ -> "" )
+        , ( "type", \_ _ _ -> "" )
+        , ( "runninghead_", \_ _ _ -> "" )
+        , ( "shiftandsetcounter", \_ _ _ -> "" )
+        , ( "visibleBanner", \_ _ _ -> "" )
+
+        -- Blocks with no dedicated LaTeX environment
+        , ( "sh", \settings_ args body -> subheading settings_ args body )
+        , ( "compact", \_ _ body -> body )
+        , ( "identity", \_ _ body -> body )
+        , ( "datatable", \_ _ body -> body )
+        , ( "red", \_ _ body -> "\\textcolor{red}{" ++ body ++ "}" )
+        , ( "red2", \_ _ body -> "\\textcolor{red!70!black}{" ++ body ++ "}" )
+        , ( "blue", \_ _ body -> "\\textcolor{blue}{" ++ body ++ "}" )
+        , ( "q", \_ _ body -> "\\textbf{Question.} " ++ body )
+        , ( "a", \_ _ body -> "\\textbf{Answer.} " ++ body )
+        , ( "reveal", \_ _ body -> body )
+        , ( "more", \_ _ body -> body )
+        , ( "env", \_ args body -> "\\textbf{" ++ String.join " " args ++ "}\\quad " ++ body )
+        , ( "indent", \_ _ body -> "\\begin{adjustwidth}{0.75cm}{}\n" ++ body ++ "\n\\end{adjustwidth}" )
+        , ( "section*", \_ _ body -> "\\section*{" ++ body ++ "}" )
+        ]
+
+
+verbatimExprDict =
+    Dict.fromList
+        [ ( "code", inlineCode )
+        , ( "math", inlineMath )
+        , ( "m", inlineMath )
+        , ( "chem", inlineChem )
+        ]
+
+
+texComment lines =
+    lines |> List.map putPercent |> String.join "\n"
+
+
+putPercent str =
+    if String.left 1 str == "%" then
+        str
+
+    else
+        "% " ++ str
+
+
+
+-- END DICTIONARIES
+
+
+inlineMath : String -> String
+inlineMath str =
+    "$" ++ str ++ "$"
+
+
+inlineChem : String -> String
+inlineChem str =
+    "$\\ce{" ++ str ++ "}$"
+
+
+inlineCode : String -> String
+inlineCode str_ =
+    let
+        str =
+            String.replace "\\" "\\\\" str_
+    in
+    --"\\texttt{" ++ str ++ "}"
+    -- "\\verb|" ++ str ++ "|"
+    "\\lstinline|" ++ str ++ "|"
+
+
+link : List Expression -> String
+link exprs =
+    let
+        args =
+            Render.Export.Util.getTwoArgs exprs
+    in
+    [ "\\href{", args.second, "}{", args.first, "}" ] |> String.join ""
+
+
+vspace : List Expression -> String
+vspace exprs =
+    let
+        arg =
+            Render.Export.Util.getOneArg exprs
+                |> String.toFloat
+                |> Maybe.withDefault 0
+                |> (\x -> x / 4.0)
+                |> String.fromFloat
+                |> (\x -> x ++ "pt")
+    in
+    [ "\\par\\vspace{", arg, "}" ] |> String.join ""
+
+
+eqref : List Expression -> String
+eqref exprs =
+    let
+        arg =
+            Render.Export.Util.getOneArg exprs
+                |> String.trim
+    in
+    [ "\\eqref{", arg, "}" ] |> String.join ""
+
+
+par : List Expression -> String
+par _ =
+    "\n\n"
+
+
+markwith : List Expression -> String
+markwith exprs =
+    let
+        arg =
+            Render.Export.Util.getOneArg exprs
+    in
+    [ "\\markwith{", arg, "}" ] |> String.join ""
+
+
+index : List Expression -> String
+index exprs =
+    let
+        args =
+            Render.Export.Util.getArgs exprs |> String.join " "
+    in
+    [ "\\index{", args, "}", "\\textit{", args, "}" ] |> String.join ""
+
+
+ilink : List Expression -> String
+ilink exprs =
+    let
+        args : { first : String, second : String }
+        args =
+            Render.Export.Util.getTwoArgs exprs
+    in
+    [ "\\href{", "https://scripta.io/s/", args.second, "}{", args.first, "}" ] |> String.join ""
+
+
+wikilink : List Expression -> String
+wikilink exprs =
+    ilink (wikilinkMoveFirstTextToEnd exprs)
+
+
+wikilinkMoveFirstTextToEnd : List Expression -> List Expression
+wikilinkMoveFirstTextToEnd exprs =
+    case exprs of
+        [ Text first firstMeta ] ->
+            [ Text first firstMeta, Text first firstMeta ]
+
+        (Text first firstMeta) :: rest ->
+            wikilinkDropLeadingWhitespace rest ++ [ Text first firstMeta ]
+
+        _ ->
+            exprs
+
+
+wikilinkDropLeadingWhitespace : List Expression -> List Expression
+wikilinkDropLeadingWhitespace exprs =
+    case exprs of
+        (Text s m) :: rest ->
+            if String.trim s == "" then
+                wikilinkDropLeadingWhitespace rest
+
+            else
+                Text s m :: rest
+
+        _ ->
+            exprs
+
+
+bolditalic : List Expression -> String
+bolditalic exprs =
+    let
+        args =
+            Render.Export.Util.getArgs exprs |> String.join " "
+    in
+    "\\textbf{\\emph{" ++ args ++ "}}"
+
+
+brackets : List Expression -> String
+brackets exprs =
+    "[" ++ (Render.Export.Util.getArgs exprs |> String.join " ") ++ "]"
+
+
+lb : List Expression -> String
+lb _ =
+    "["
+
+
+rb : List Expression -> String
+rb _ =
+    "]"
+
+
+bt : List Expression -> String
+bt _ =
+    --"\\backtick{}"
+    "\\`{}"
+
+
+underscore : List Expression -> String
+underscore _ =
+    "$\\_$"
+
+
+blindIndex : String
+blindIndex =
+    ""
+
+
+setcounter : List String -> String
+setcounter args =
+    [ "\\setcounter{section}{", Utility.getArg "0" 0 args, "}" ] |> String.join ""
+
+
+subheading : RenderSettings -> List String -> String -> String
+subheading settings args body =
+    "\\vspace{8pt}{\\Large " ++ body ++ "}"
+
+
+smallsubheading : RenderSettings -> List String -> String -> String
+smallsubheading settings args body =
+    "\\vspace{4pt}{\\large " ++ body ++ "}"
+
+
+descriptionItem : List String -> String -> String
+descriptionItem args body =
+    let
+        arg =
+            argString args
+    in
+    case args of
+        [] ->
+            "\\item{" ++ body ++ "}"
+
+        _ ->
+            "\\item[" ++ arg ++ "]{" ++ body ++ "}"
+
+
+argString : List String -> String
+argString args =
+    List.filter (\arg -> not <| String.contains "label:" arg) args |> String.join " "
+
+
+chapter : RenderSettings -> List String -> String -> String
+chapter _ _ body =
+    let
+        tag =
+            body
+                |> String.words
+                |> MiniLaTeX.Util.normalizedWord
+
+        label =
+            " \\label{" ++ tag ++ "}"
+    in
+    "\\chapter{" ++ body ++ "}" ++ label
+
+
+section : RenderSettings -> List String -> String -> String
+section settings args body =
+    let
+        maxNumberedLevel : Float
+        maxNumberedLevel =
+            Dict.get "number-to-level" settings.properties
+                |> Maybe.andThen String.toFloat
+                |> Maybe.withDefault 3
+
+        tag =
+            body
+                |> String.words
+                |> MiniLaTeX.Util.normalizedWord
+
+        label =
+            " \\label{" ++ tag ++ "}"
+
+        suffix =
+            case List.Extra.getAt 1 args of
+                Nothing ->
+                    ""
+
+                Just "-" ->
+                    "*"
+
+                Just _ ->
+                    ""
+
+        levelAsString =
+            Utility.getArg "4" 0 args
+
+        levelAsFloat =
+            case String.toFloat levelAsString of
+                Just n ->
+                    n
+
+                Nothing ->
+                    0
+
+        -- Depth is level minus 1 (since level 1 is title, level 2 is depth 1, etc.)
+        depthForNumbering =
+            levelAsFloat - 1
+    in
+    case levelAsString of
+        "1" ->
+            -- For documents with multiple sections, treat level 1 as section, not title
+            -- This ensures they appear in the table of contents
+            if depthForNumbering < maxNumberedLevel then
+                macro1 ("section" ++ suffix) body ++ label
+
+            else
+                macro1 ("section*" ++ suffix) body ++ label
+
+        "2" ->
+            if depthForNumbering < maxNumberedLevel then
+                macro1 ("subsection" ++ suffix) body ++ label
+
+            else
+                macro1 ("subsection*" ++ suffix) body ++ label
+
+        "3" ->
+            if depthForNumbering < maxNumberedLevel then
+                macro1 ("subsubsection" ++ suffix) body ++ label
+
+            else
+                macro1 ("subsubsection*" ++ suffix) body ++ label
+
+        "4" ->
+            if depthForNumbering < maxNumberedLevel then
+                macro1 ("paragraph" ++ suffix) body ++ label
+
+            else
+                macro1 ("paragraph*" ++ suffix) body ++ label
+
+        _ ->
+            macro1 ("subheading" ++ suffix) body ++ label
+
+
+section2 : List String -> String -> String
+section2 args body =
+    let
+        tag =
+            body
+                |> String.words
+                |> MiniLaTeX.Util.normalizedWord
+
+        label =
+            " \\label{" ++ tag ++ "}"
+
+        suffix =
+            case List.Extra.getAt 1 args of
+                Nothing ->
+                    ""
+
+                Just "-" ->
+                    "*"
+
+                Just _ ->
+                    ""
+    in
+    case Utility.getArg "4" 0 args of
+        "1" ->
+            macro1 ("section" ++ suffix) body ++ label
+
+        "2" ->
+            macro1 ("subsection" ++ suffix) body ++ label
+
+        "3" ->
+            macro1 ("subsubsection" ++ suffix) body ++ label
+
+        _ ->
+            macro1 ("subheading" ++ suffix) body ++ label
+
+
+macro1 : String -> String -> String
+macro1 name arg =
+    if name == "math" then
+        "$" ++ arg ++ "$"
+
+    else if name == "group" then
+        arg
+
+    else if name == "tags" then
+        ""
+
+    else
+        case Dict.get name functionDict of
+            Nothing ->
+                "\\" ++ unalias name ++ "{" ++ mapChars2 (String.trimLeft arg) ++ "}"
+
+            Just fName ->
+                "\\" ++ fName ++ "{" ++ mapChars2 (String.trimLeft arg) ++ "}"
+
+
+exportExprList : ETeX.MathMacros.MathMacroDict -> RenderSettings -> List Expression -> String
+exportExprList mathMacroDict settings exprs =
+    List.map (exportExpr mathMacroDict settings) exprs |> String.join "" |> mapChars1
+
+
+{-| Export an expression to LaTeX. Handles both Fun and VFun variants.
+
+For [math ...], [m ...], [chem ...], [code ...] expressions (parsed as Fun),
+extract the text content and render as LaTeX math mode, matching the behavior
+of $...$ expressions (parsed as VFun).
+
+-}
+exportExpr : ETeX.MathMacros.MathMacroDict -> RenderSettings -> Expression -> String
+exportExpr mathMacroDict settings expr =
+    case expr of
+        Fun name exps_ _ ->
+            if List.member name [ "scheme", "compute", "data", "button", "newPost", "tableRow", "tableItem" ] then
+                "[" ++ name ++ "]:unknown"
+
+            else if name == "table" then
+                exportInlineTable mathMacroDict settings exps_
+
+            else if name == "sup" then
+                renderSup name exps_
+
+            else if name == "sub" then
+                renderSub name exps_
+
+            else if name == "bi" then
+                renderBi name exps_
+
+            else if name == "ds" then
+                renderDs
+                -- Handle verbatim-like functions: [math x^2] should export like $x^2$
+
+            else if List.member name [ "chem", "math", "m", "code" ] then
+                let
+                    arg =
+                        case exps_ of
+                            [ Text str _ ] ->
+                                str
+
+                            _ ->
+                                "Invalid argument to " ++ name
+                in
+                case name of
+                    "math" ->
+                        "\\(" ++ ETeX.Transform.transformETeX mathMacroDict arg ++ "\\)"
+
+                    "m" ->
+                        "\\(" ++ ETeX.Transform.transformETeX mathMacroDict arg ++ "\\)"
+
+                    "chem" ->
+                        "\\(\\ce{" ++ arg ++ "}\\)"
+
+                    "code" ->
+                        "[code " ++ arg ++ "]"
+
+                    _ ->
+                        "Invalid " ++ name ++ " in [" ++ name ++ " " ++ arg ++ "]"
+
+            else if name == "lambda" then
+                case Generic.TextMacro.extract expr of
+                    Just lambda ->
+                        Generic.TextMacro.toString (exportExpr mathMacroDict settings) lambda
+
+                    Nothing ->
+                        "Error extracting lambda"
+
+            else if name == "dollar" || name == "ds" then
+                "\\$"
+
+            else
+                case Dict.get name macroDict of
+                    Just f ->
+                        f settings exps_
+
+                    Nothing ->
+                        -- For nested expressions, we need to combine the content properly
+                        let
+                            exportedExprs =
+                                List.map (exportExpr mathMacroDict settings) exps_
+
+                            combinedContent =
+                                String.join "" exportedExprs
+                        in
+                        "\\" ++ unalias name ++ "{" ++ combinedContent ++ "}"
+
+        Text str _ ->
+            mapChars2 str
+
+        VFun name body _ ->
+            if name == "math" then
+                "\\(" ++ ETeX.Transform.transformETeX mathMacroDict body ++ "\\)"
+
+            else
+                renderVerbatim mathMacroDict name body
+
+        ExprList _ itemExprs _ ->
+            -- Export the list of expressions
+            exportExprList mathMacroDict settings itemExprs
+
+
+
+{- HELPERS FOR exportExpr -}
+
+
+{-| Export an inline `[table [tableRow [tableItem ...]]]` expression to a
+LaTeX `tabular`.
+-}
+exportInlineTable : ETeX.MathMacros.MathMacroDict -> RenderSettings -> List Expression -> String
+exportInlineTable mathMacroDict settings rowExprs =
+    let
+        isItem : Expression -> Bool
+        isItem expr =
+            case expr of
+                Fun "tableItem" _ _ ->
+                    True
+
+                _ ->
+                    False
+
+        cellsOf : Expression -> List Expression
+        cellsOf expr =
+            case expr of
+                Fun "tableRow" cells _ ->
+                    List.filter isItem cells
+
+                _ ->
+                    []
+
+        exportCell : Expression -> String
+        exportCell expr =
+            case expr of
+                Fun "tableItem" cellExprs _ ->
+                    exportExprList mathMacroDict settings cellExprs
+
+                _ ->
+                    ""
+
+        rows : List (List Expression)
+        rows =
+            rowExprs
+                |> List.filterMap
+                    (\e ->
+                        case e of
+                            Fun "tableRow" _ _ ->
+                                Just (cellsOf e)
+
+                            _ ->
+                                Nothing
+                    )
+
+        columnCount : Int
+        columnCount =
+            rows |> List.map List.length |> List.maximum |> Maybe.withDefault 1
+
+        renderedRows : String
+        renderedRows =
+            rows
+                |> List.map (\cells -> cells |> List.map exportCell |> String.join " & ")
+                |> String.join " \\\\\n"
+    in
+    "\\begin{tabular}{" ++ String.repeat columnCount "l" ++ "}\n" ++ renderedRows ++ "\n\\end{tabular}"
+
+
+renderSup name exps_ =
+    let
+        arg =
+            case exps_ of
+                [ Text str _ ] ->
+                    str
+
+                _ ->
+                    "Invalid argument to " ++ name
+    in
+    "${}^{\\text{" ++ arg ++ "}}$"
+
+
+renderSub name exps_ =
+    let
+        arg =
+            case exps_ of
+                [ Text str _ ] ->
+                    str
+
+                _ ->
+                    "Invalid argument to " ++ name
+    in
+    "${}_{\\text{" ++ arg ++ "}}$"
+
+
+renderBi name exps_ =
+    let
+        arg =
+            case exps_ of
+                [ Text str _ ] ->
+                    "\\textbf{\\textit{" ++ str ++ "}}"
+
+                _ ->
+                    "Invalid argument to " ++ name
+    in
+    "\\text{" ++ arg ++ "}"
+
+
+renderDs =
+    "\\$"
+
+
+{-| Use this to unalias names
+-}
+unalias : String -> String
+unalias str =
+    case Dict.get str aliases of
+        Nothing ->
+            str
+
+        Just realName_ ->
+            realName_
+
+
+aliases : Dict String String
+aliases =
+    Dict.fromList
+        [ ( "i", "textit" )
+        , ( "italic", "textit" )
+        , ( "b", "textbf" )
+        , ( "bold", "textbf" )
+        , ( "large", "large" )
+        , ( "red", "textcolor{red}" )
+        , ( "blue", "textcolor{blue}" )
+        , ( "green", "textcolor{green}" )
+        , ( "pink", "textcolor{pink}" )
+        , ( "magenta", "textcolor{magenta}" )
+        , ( "violet", "textcolor{violet}" )
+        , ( "gray", "textcolor{gray}" )
+        , ( "comment", "textcolor{blue}" )
+        , ( "strike", "sout" )
+        , ( "ssh", "smallsubheading" )
+        ]
+
+
+encloseWithBraces : String -> String
+encloseWithBraces str_ =
+    "{" ++ String.trim str_ ++ "}"
+
+
+renderVerbatim : ETeX.MathMacros.MathMacroDict -> String -> String -> String
+renderVerbatim mathMacroDict name body =
+    case Dict.get name verbatimExprDict of
+        Nothing ->
+            name ++ "(" ++ body ++ ") — unimplemented "
+
+        Just f ->
+            if List.member name [ "equation", "aligned", "math" ] then
+                body |> MiniLaTeX.Util.transformLabel |> ETeX.Transform.transformETeX mathMacroDict |> f
+
+            else
+                body |> fixChars |> MiniLaTeX.Util.transformLabel |> f
+
+
+
+-- HELPERS
+
+
+tagged name body =
+    "\\" ++ name ++ "{" ++ body ++ "}"
+
+
+environment name body =
+    [ tagged "begin" name, body, tagged "end" name ] |> String.join "\n"

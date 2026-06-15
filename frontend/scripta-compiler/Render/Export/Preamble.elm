@@ -1,0 +1,389 @@
+module Render.Export.Preamble exposing (Publication, make, supportingCode)
+
+-- PREAMBLE
+
+import List.Extra
+import Render.Types
+
+
+type alias Publication =
+    { title : String
+    , authorList : List String
+    , kind : String
+    , date : String
+    }
+
+
+
+-- make : Publication -> List String -> List String -> String
+
+
+make : Render.Types.PublicationData -> List String -> List String -> String
+make publicationData =
+    case publicationData.kind of
+        Render.Types.DKBook ->
+            makeBook
+
+        _ ->
+            makeArticle
+
+
+
+-- makeBook : List String -> List String -> String
+
+
+makeBook blockNames_ expressionNames_ =
+    let
+        names =
+            blockNames_ ++ expressionNames_
+
+        packagesUsed =
+            packagesNeeded names
+    in
+    [ "\\documentclass[11pt, oneside]{book}"
+    , newPackageText packagesUsed
+    , supportingCode packagesUsed
+    , standardPackages
+    , commands
+    ]
+        |> String.join "\n"
+
+
+makeArticle : List String -> List String -> String
+makeArticle blockNames_ expressionNames_ =
+    let
+        names =
+            blockNames_ ++ expressionNames_
+
+        packagesUsed =
+            packagesNeeded names
+    in
+    [ "\\documentclass[11pt, oneside]{article}"
+    , newPackageText packagesUsed
+    , supportingCode packagesUsed
+    , standardPackages
+    , commands
+    ]
+        |> String.join "\n"
+
+
+
+-- PACKAGELIST
+
+
+packageList =
+    [ ( "quiver", [ "tikz-cd" ] )
+    , ( "tikz", [ "tikz" ] )
+
+    --, ( "link", [ "hyperref" ] )
+    --, ( "ilink", [ "hyperref" ] )
+    , ( "href", [ "hyperref" ] )
+    , ( "textcolor", [ "xcolor" ] )
+    , ( "blue", [ "xcolor" ] )
+    , ( "red", [ "xcolor" ] )
+    , ( "green", [ "xcolor" ] )
+    , ( "gray", [ "xcolor" ] )
+    , ( "magenta", [ "xcolor" ] )
+    , ( "violet", [ "xcolor" ] )
+    , ( "pink", [ "xcolor" ] )
+    , ( "highlight", [ "xcolor" ] )
+    , ( "highlight", [ "soul" ] )
+    , ( "strike", [ "soul" ] )
+    , ( "errorHighlight", [ "xcolor" ] )
+    , ( "image", [ "graphicx", "wrapfig", "float" ] )
+    , ( "box", [ "tcolorbox" ] )
+
+    --, ( "ce", [ "mhchem" ] )
+    ]
+
+
+setupCode =
+    [ ( "graphicx", "\\graphicspath{ {image/} }" )
+    , ( "hyperref", hypersetup )
+    ]
+
+
+hypersetup =
+    """
+\\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=blue,
+}
+"""
+
+
+packagesNeeded : List String -> List String
+packagesNeeded names =
+    names
+        |> newPackageList
+        |> List.Extra.unique
+        |> List.sort
+
+
+{-|
+
+    'blockNames' is a list of blocks that occur in a document
+    to be exported.  'newPackageList blockNames' is a list
+    of the corresponding packages that the document will need
+    to handle the given blocks.
+
+-}
+newPackageText : List String -> String
+newPackageText packagesNeeded_ =
+    packagesNeeded_
+        |> List.map (\name -> "\\usepackage{" ++ name ++ "}")
+        |> String.join "\n"
+
+
+newPackageList : List String -> List String
+newPackageList names =
+    List.foldl (\( entityName, packageNames ) acc -> addPackage names entityName packageNames acc) [] packageList
+
+
+supportingCode : List String -> String
+supportingCode packagesInDocument =
+    List.foldl (\( entityName, packageNames ) acc -> addCode packagesInDocument entityName packageNames acc) "" setupCode
+
+
+{-| If
+-}
+addPackage : List String -> String -> List String -> List String -> List String
+addPackage namesInDocument entityName packageNames packages_ =
+    if List.member entityName namesInDocument then
+        packageNames ++ packages_
+
+    else
+        packages_
+
+
+addCode : List String -> String -> String -> String -> String
+addCode packagesInDocument package codeText accumulatedCodeText =
+    if List.member package packagesInDocument then
+        codeText ++ "\n\n" ++ accumulatedCodeText
+
+    else
+        accumulatedCodeText
+
+
+
+--
+--packages entityNames =
+--    [ newPackages entityNames, standardPackages ] |> String.join "\n"
+
+
+standardPackages =
+    """
+%% Packages
+
+\\usepackage{listings}
+\\usepackage{xcolor}    % always available so \\textcolor works
+
+%% Standard packages
+\\usepackage{geometry}
+\\geometry{letterpaper}
+\\usepackage{changepage}  % for the adjustwidth environment
+\\usepackage{graphicx}    % for \\includegraphics
+
+%% Index, hyperref
+\\usepackage[T1]{fontenc}
+\\usepackage{lmodern}
+
+\\usepackage{hyperref}   % load before imakeidx
+\\usepackage{imakeidx}
+
+%%%%
+\\usepackage[normalem]{ulem} % for \\st
+\\usepackage{soul}           % for \\hl and \\sethlcolor
+\\usepackage{wrapfig}        % for wrapfigure
+
+%% AMS
+\\usepackage{amssymb}
+\\usepackage{amsmath}
+\\usepackage{amsthm}    % for the proof environment
+
+\\usepackage{amscd}
+
+\\usepackage{fancyvrb} %% for inline verbatim
+\\usepackage{makeidx}
+
+%% Chemistry
+\\usepackage[version=4]{mhchem} % for \\ce
+
+"""
+
+
+commands =
+    """
+%% Commands
+
+\\newcommand{\\hang}[1]{%
+  {%
+    \\setlength{\\leftskip}{1em}%
+    \\setlength{\\hangindent}{1em}%
+    \\hangafter=1 %
+    #1\\ \\vpace{4}%
+  }%
+}
+
+\\renewcommand{\\labelitemi}{\\scalebox{0.7}{\\textbullet}}
+
+% Dot box = 1em, gap = 1em → total = 2em
+\\newcommand{\\compactItem}[1]{%
+  \\par
+\\noindent
+  \\hangindent=2em \\hangafter=1%
+  \\makebox[1em][l]{\\labelitemi}\\hspace{1em}#1\\par
+}
+
+\\newcommand{\\code}[1]{{\\tt #1}}
+\\newcommand{\\ellie}[1]{\\href{#1}{Link to Ellie}}
+% \\newcommand{\\image}[3]{\\includegraphics[width=3cm]{#1}}
+
+%% width=4truein,keepaspectratio]
+
+
+% imagecentercaptioned command removed - using standard figure environment instead
+
+\\newcommand{\\imagecenter}[2]{
+   \\medskip
+   \\begin{figure}[htp]
+   \\centering
+    \\includegraphics[width=#2]{#1}
+    \\vglue0pt
+    \\end{figure}
+    \\medskip
+}
+
+\\newcommand{\\imagefloat}[4]{
+    \\begin{wrapfigure}{#4}{#2}
+    \\includegraphics[width=#2]{#1}
+    \\caption{#3}
+    \\end{wrapfigure}
+}
+
+
+\\newcommand{\\imagefloatright}[3]{
+    \\begin{wrapfigure}{R}{0.30\\textwidth}
+    \\includegraphics[width=0.30\\textwidth]{#1}
+    \\caption{#2}
+    \\end{wrapfigure}
+}
+
+\\newcommand{\\hide}[1]{}
+
+
+\\newcommand{\\imagefloatleft}[3]{
+    \\begin{wrapfigure}{L}{0.3-\\textwidth}
+    \\includegraphics[width=0.30\\textwidth]{#1}
+    \\caption{#2}
+    \\end{wrapfigure}
+}
+% Font style
+\\newcommand{\\italic}[1]{{\\sl #1}}
+\\newcommand{\\strong}[1]{{\\bf #1}}
+\\newcommand{\\strike}[1]{\\st{#1}}
+
+% Scripta
+\\newcommand{\\ilink}[2]{\\href{{https://scripta.io/s/#1}}{#2}}
+\\newcommand{\\markwith}[1]{}
+\\newcommand{\\anchor}[1]{#1}
+
+% Color
+\\newcommand{\\red}[1]{\\textcolor{red}{#1}}
+\\newcommand{\\blue}[1]{\\textcolor{blue}{#1}}
+\\newcommand{\\violet}[1]{\\textcolor{violet}{#1}}
+\\newcommand{\\highlight}[1]{\\texorpdfstring{\\protect\\hl{#1}}{#1}}
+
+% WTF?
+\\newcommand{\\remote}[1]{\\textcolor{red}{#1}}
+\\newcommand{\\local}[1]{\\textcolor{blue}{#1}}
+
+% Unclassified
+\\newcommand{\\subheading}[1]{{\\bf #1}\\par}
+\\newcommand{\\smallsubheading}[1]{{\\bf\\small #1}\\par}
+%\\newcommand{\\term}[1]{{\\index{#1}}}
+%\\newcommand{\\termx}[1]{}
+\\providecommand{\\comment}[1]{}
+\\newcommand{\\innertableofcontents}{}
+
+% Inline elements without a standard LaTeX command
+\\providecommand{\\boldItalic}[1]{\\textbf{\\textit{#1}}}
+\\providecommand{\\var}[1]{\\textit{#1}}
+\\providecommand{\\marked}[1]{#1}
+\\providecommand{\\bracket}[1]{[#1]}
+\\providecommand{\\sh}[1]{\\subheading{#1}}
+\\providecommand{\\ulink}[1]{#1}
+\\providecommand{\\reflink}[1]{#1}
+\\providecommand{\\cslink}[1]{#1}
+\\providecommand{\\progress}[1]{#1}
+\\providecommand{\\inlineimage}[1]{}
+\\newcommand{\\mdash}{---}
+\\newcommand{\\ndash}{--}
+% \\chapter does not exist in the article class; fall back to \\section
+\\providecommand{\\chapter}[1]{\\section{#1}}
+
+
+% Special character
+\\newcommand{\\dollarSign}[0]{{\\$}}
+\\newcommand{\\backTick}[0]{\\`{}}
+
+%% Theorems
+\\newtheorem{remark}{Remark}
+\\newtheorem{theorem}{Theorem}
+\\newtheorem{axiom}{Axiom}
+\\newtheorem{lemma}{Lemma}
+\\newtheorem{proposition}{Proposition}
+\\newtheorem{corollary}{Corollary}
+\\newtheorem{definition}{Definition}
+\\newtheorem{example}{Example}
+\\newtheorem{exercise}{Exercise}
+\\newtheorem{problem}{Problem}
+\\newtheorem{exercises}{Exercises}
+\\newtheorem{note}{Note}
+\\newtheorem{question}{Question}
+\\newcommand{\\bs}[1]{$\\backslash$#1}
+\\newcommand{\\texarg}[1]{\\{#1\\}}
+
+
+%% Environments
+\\renewenvironment{quotation}
+  {\\begin{adjustwidth}{2cm}{} \\footnotesize}
+  {\\end{adjustwidth}}
+
+\\def\\changemargin#1#2{\\list{}{\\rightmargin#2\\leftmargin#1}\\item[]}
+\\let\\endchangemargin=\\endlist
+
+
+
+%% NEWCOMMAND
+
+% \\definecolor{mypink1}{rgb}{0.858, 0.188, 0.478}
+% \\definecolor{mypink2}{RGB}{219, 48, 122}
+\\newcommand{\\fontRGB}[4]{
+    \\definecolor{mycolor}{RGB}{#1, #2, #3}
+    \\textcolor{mycolor}{#4}
+    }
+
+\\newcommand{\\highlightRGB}[4]{
+    \\definecolor{mycolor}{RGB}{#1, #2, #3}
+    \\sethlcolor{mycolor}
+    \\hl{#4}
+     \\sethlcolor{yellow}
+    }
+
+\\newcommand{\\gray}[2]{
+\\definecolor{mygray}{gray}{#1}
+\\textcolor{mygray}{#2}
+}
+
+\\newcommand{\\white}[1]{\\gray{1}[#1]}
+\\newcommand{\\medgray}[1]{\\gray{0.5}[#1]}
+\\newcommand{\\black}[1]{\\gray{0}[#1]}
+
+% Spacing
+\\parindent0pt
+\\parskip5pt
+
+"""
