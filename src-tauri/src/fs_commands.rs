@@ -101,6 +101,50 @@ pub fn write_file(root: String, path: String, content: String) -> Result<u64, St
     write_file_impl(Path::new(&root), &path, &content)
 }
 
+pub fn create_dir_impl(root: &Path, rel: &str) -> Result<(), String> {
+    std::fs::create_dir_all(root.join(rel)).map_err(|e| e.to_string())
+}
+
+pub fn create_file_impl(root: &Path, rel: &str, content: &str) -> Result<u64, String> {
+    let abs = root.join(rel);
+    if abs.exists() {
+        return Err(format!("{} already exists", rel));
+    }
+    write_file_impl(root, rel, content)
+}
+
+pub fn rename_impl(root: &Path, rel: &str, new_rel: &str) -> Result<(), String> {
+    let to = root.join(new_rel);
+    if let Some(parent) = to.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(root.join(rel), to).map_err(|e| e.to_string())
+}
+
+pub fn delete_impl(root: &Path, rel: &str) -> Result<(), String> {
+    trash::delete(root.join(rel)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_dir(root: String, path: String) -> Result<(), String> {
+    create_dir_impl(Path::new(&root), &path)
+}
+
+#[tauri::command]
+pub fn create_file(root: String, path: String, content: String) -> Result<u64, String> {
+    create_file_impl(Path::new(&root), &path, &content)
+}
+
+#[tauri::command]
+pub fn rename(root: String, path: String, new_path: String) -> Result<(), String> {
+    rename_impl(Path::new(&root), &path, &new_path)
+}
+
+#[tauri::command]
+pub fn delete(root: String, path: String) -> Result<(), String> {
+    delete_impl(Path::new(&root), &path)
+}
+
 /// Opens a native folder-picker dialog and returns the chosen path as a UTF-8 string,
 /// or `None` if the user cancels.
 ///
@@ -181,5 +225,41 @@ mod tests {
         let root = dir.path();
         write_file_impl(root, "nested/deep/a.scripta", "x").unwrap();
         assert!(root.join("nested/deep/a.scripta").exists());
+    }
+
+    #[test]
+    fn creates_file_and_dir() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        create_dir_impl(root, "newdir").unwrap();
+        create_file_impl(root, "newdir/x.scripta", "").unwrap();
+        assert!(root.join("newdir/x.scripta").exists());
+    }
+
+    #[test]
+    fn create_file_refuses_to_overwrite() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        create_file_impl(root, "a.scripta", "first").unwrap();
+        assert!(create_file_impl(root, "a.scripta", "second").is_err());
+    }
+
+    #[test]
+    fn renames_path() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        fs::write(root.join("a.scripta"), "x").unwrap();
+        rename_impl(root, "a.scripta", "b.scripta").unwrap();
+        assert!(!root.join("a.scripta").exists());
+        assert!(root.join("b.scripta").exists());
+    }
+
+    #[test]
+    fn delete_moves_to_trash_not_hard_delete() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+        fs::write(root.join("a.scripta"), "x").unwrap();
+        delete_impl(root, "a.scripta").unwrap();
+        assert!(!root.join("a.scripta").exists());
     }
 }

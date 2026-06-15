@@ -8,6 +8,10 @@ pub fn run() {
             fs_commands::pick_workspace,
             fs_commands::read_file,
             fs_commands::write_file,
+            fs_commands::create_dir,
+            fs_commands::create_file,
+            fs_commands::rename,
+            fs_commands::delete,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
