@@ -84,7 +84,7 @@ All commands return `Result`; failures surface to Elm as errors, never crashes.
 | `Types.elm` | `Model`, `Msg`, shared records |
 | `Workspace.elm` | file-tree model; **node id = path relative to vault root** (no UUIDs/humanIds) |
 | `FileOps.elm` | encode/decode FS port messages + `requestId` correlation |
-| `Editor.elm` | CodeMirror port integration (ported from v4) |
+| `Editor.elm` | CodeMirror integration — DOM ids + `text-change` CustomEvent decoder (ported from v4); the `<codemirror-editor>` element is prebuilt JS copied as-is |
 | `Render.elm` | wraps `Scripta.parse/reparse/render`; maps `Event` → `Msg` (ported/trimmed from v4) |
 | `SaveState.elm` | debounced-save state machine (trimmed from v4) |
 | `Language.elm` | `Scripta \| MiniLaTeX \| Markdown` from file extension (the `.tex`/`.md` seam) |
@@ -115,12 +115,14 @@ Parse errors need no special handling — the compiler renders error blocks inli
 
 ### Math (KaTeX, offline)
 
-KaTeX is **vendored into the repo** — `katex.min.css`, the KaTeX JS, the
-auto-render extension, and the KaTeX fonts are committed as app assets (e.g.
+KaTeX is **vendored into the repo** — `katex.min.css`, `katex.min.js`, the
+`mhchem` extension, and the KaTeX fonts are committed as app assets (e.g.
 `frontend/vendor/katex/`) and bundled by Tauri. Nothing is fetched from a CDN
 at build time or run time, so the app renders math with **no internet
-connection**. After each render the preview container is re-typeset via a
-`typesetMath` port fired after Elm patches the DOM.
+connection**. The Scripta compiler emits `<math-text>` elements; a
+**`math-text` custom element** (ported from v4's `index.html`) renders each one
+via `katex.renderToString` in its `connectedCallback` — so no `typesetMath`
+port is needed; math self-renders when the DOM updates.
 
 Note: KaTeX ships web fonts (`.woff2` etc.); these must be vendored alongside
 the CSS and the CSS `@font-face` URLs must resolve to the local copies, or math
