@@ -5,6 +5,7 @@ import Json.Decode as D
 import Language
 import SaveState
 import Scripta
+import Set exposing (Set)
 import Workspace exposing (Node)
 
 
@@ -25,6 +26,7 @@ type alias Model =
     , contentWidth : Int
     , saveState : SaveState.SaveState
     , newName : String
+    , openFolders : Set String
     }
 
 
@@ -70,3 +72,5 @@ type Msg
     | ClickedExportHtml
     | ClickedExportLatex
     | GotOpenFile D.Value
+    | ToggledFolder String
+    | GotOpenFolders D.Value

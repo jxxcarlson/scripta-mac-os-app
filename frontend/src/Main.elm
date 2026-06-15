@@ -7,10 +7,12 @@ import FileOps
 import Json.Decode as D
 import Json.Encode as E
 import Language
+import OpenFolders
 import Process
 import Render
 import SaveState
 import Scripta
+import Set
 import Task
 import PathUtil
 import Types exposing (Model, Msg(..), PendingOp(..))
@@ -49,6 +51,7 @@ init _ =
         , contentWidth = 500
         , saveState = SaveState.init
         , newName = ""
+        , openFolders = Set.empty
         }
 
 
@@ -82,6 +85,7 @@ openExternalFile abs model =
                 | vaultRoot = Just parent
                 , selectedPath = Just name
                 , language = Language.fromPath name
+                , openFolders = Set.empty
             }
 
         ( m1, c1 ) =
@@ -93,7 +97,22 @@ openExternalFile abs model =
         ( m3, c3 ) =
             request (PReadFile name) "read_file" [ ( "root", E.string parent ), ( "path", E.string name ) ] m2
     in
-    ( m3, Cmd.batch [ c1, c2, c3 ] )
+    ( m3, Cmd.batch [ c1, c2, c3, FileOps.requestOpenFolders parent ] )
+
+
+saveOpenFoldersCmd : Maybe String -> Set.Set String -> Cmd Msg
+saveOpenFoldersCmd maybeVault folders =
+    case maybeVault of
+        Just vault ->
+            FileOps.saveOpenFolders
+                (E.object
+                    [ ( "vault", E.string vault )
+                    , ( "folders", E.list E.string (Set.toList folders) )
+                    ]
+                )
+
+        Nothing ->
+            Cmd.none
 
 
 applySaveAction : SaveState.Action -> Model -> ( Model, Cmd Msg )
@@ -292,6 +311,18 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        ToggledFolder path ->
+            let
+                folders =
+                    OpenFolders.toggle path model.openFolders
+            in
+            ( { model | openFolders = folders }
+            , saveOpenFoldersCmd model.vaultRoot folders
+            )
+
+        GotOpenFolders value ->
+            ( { model | openFolders = OpenFolders.fromValue value }, Cmd.none )
+
         GotOpenFile value ->
             case D.decodeValue (D.field "path" D.string) value of
                 Ok abs ->
@@ -336,12 +367,12 @@ handleResponse op resp model =
                         Ok (Just root) ->
                             let
                                 ( m1, c1 ) =
-                                    request PListWorkspace "list_workspace" [ ( "root", E.string root ) ] { model | vaultRoot = Just root }
+                                    request PListWorkspace "list_workspace" [ ( "root", E.string root ) ] { model | vaultRoot = Just root, openFolders = Set.empty }
 
                                 ( m2, c2 ) =
                                     request PNoop "watch_workspace" [ ( "root", E.string root ) ] m1
                             in
-                            ( m2, Cmd.batch [ c1, c2 ] )
+                            ( m2, Cmd.batch [ c1, c2, FileOps.requestOpenFolders root ] )
 
                         Ok Nothing ->
                             -- user cancelled the folder picker
@@ -424,6 +455,7 @@ subscriptions _ =
         [ FileOps.fsResponse GotFsResponse
         , FileOps.fileChanged GotFileChanged
         , FileOps.openFile GotOpenFile
+        , FileOps.gotOpenFolders GotOpenFolders
         ]
 
 

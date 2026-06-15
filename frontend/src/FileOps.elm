@@ -2,6 +2,7 @@ port module FileOps exposing
     ( FsResponse
     , fsRequest, fsResponse, fileChanged, openFile
     , scrollToElement
+    , saveOpenFolders, requestOpenFolders, gotOpenFolders
     , encodeRequest, responseDecoder, resultOf
     , send
     )
@@ -28,6 +29,15 @@ port openFile : (E.Value -> msg) -> Sub msg
 
 
 port scrollToElement : String -> Cmd msg
+
+
+port saveOpenFolders : E.Value -> Cmd msg
+
+
+port requestOpenFolders : String -> Cmd msg
+
+
+port gotOpenFolders : (E.Value -> msg) -> Sub msg
 
 
 type alias FsResponse =
