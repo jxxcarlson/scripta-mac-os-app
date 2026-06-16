@@ -311,6 +311,81 @@ pub fn set_last_vault(app: tauri::AppHandle, vault: String) -> Result<(), String
     write_last_vault(&last_vault_file(&app)?, &vault).map_err(|e| e.to_string())
 }
 
+/// A concise, human-readable error from a latexmk/pdflatex run for the UI banner:
+/// the first LaTeX error line ("! ...") plus the following line, else a tail of the output.
+pub fn latex_error_summary(output: &str) -> String {
+    let lines: Vec<&str> = output.lines().collect();
+    if let Some(i) = lines.iter().position(|l| l.starts_with("! ")) {
+        let mut msg = lines[i].to_string();
+        if let Some(next) = lines.get(i + 1) {
+            if !next.trim().is_empty() {
+                msg.push('\n');
+                msg.push_str(next);
+            }
+        }
+        msg
+    } else {
+        let mut tail: Vec<&str> = lines.iter().rev().take(8).cloned().collect();
+        tail.reverse();
+        tail.join("\n")
+    }
+}
+
+/// PATH for invoking TeX tools, augmented with common install dirs so the engine
+/// resolves even when the app is launched from Finder (minimal PATH).
+fn tex_path_env() -> String {
+    let extra = "/Library/TeX/texbin:/usr/local/bin:/opt/homebrew/bin";
+    match std::env::var("PATH") {
+        Ok(p) if !p.is_empty() => format!("{extra}:{p}"),
+        _ => extra.to_string(),
+    }
+}
+
+/// Compile the given LaTeX source to PDF with latexmk, then save via a dialog.
+#[tauri::command]
+pub async fn export_pdf(
+    app: tauri::AppHandle,
+    default_name: String,
+    tex: String,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
+    let tex_path = dir.path().join("document.tex");
+    std::fs::write(&tex_path, &tex).map_err(|e| e.to_string())?;
+
+    let out = std::process::Command::new("latexmk")
+        .args(["-pdf", "-interaction=nonstopmode", "-halt-on-error", "document.tex"])
+        .current_dir(dir.path())
+        .env("PATH", tex_path_env())
+        .output()
+        .map_err(|e| format!("Could not run latexmk (is MacTeX installed?): {e}"))?;
+
+    let pdf_path = dir.path().join("document.pdf");
+    if !pdf_path.exists() {
+        let combined = format!(
+            "{}\n{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        return Err(format!("PDF generation failed:\n{}", latex_error_summary(&combined)));
+    }
+
+    let chosen = app
+        .dialog()
+        .file()
+        .set_file_name(&default_name)
+        .blocking_save_file();
+    match chosen {
+        Some(path) => {
+            let dest = path.into_path().map_err(|e| e.to_string())?;
+            std::fs::copy(&pdf_path, &dest).map_err(|e| e.to_string())?;
+            Ok(Some(dest.to_string_lossy().to_string()))
+        }
+        None => Ok(None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -468,5 +543,22 @@ mod tests {
         let f = dir.path().join("last_vault.txt");
         write_last_vault(&f, "   \n").unwrap();
         assert_eq!(read_last_vault(&f), None);
+    }
+
+    #[test]
+    fn latex_error_summary_extracts_bang_line() {
+        let log = "noise\n! Undefined control sequence.\nl.42 \\foo\ntrailing";
+        assert_eq!(
+            latex_error_summary(log),
+            "! Undefined control sequence.\nl.42 \\foo"
+        );
+    }
+
+    #[test]
+    fn latex_error_summary_falls_back_to_tail() {
+        let log = "alpha\nbeta\ngamma";
+        let s = latex_error_summary(log);
+        assert!(!s.is_empty());
+        assert!(s.contains("gamma"));
     }
 }
