@@ -380,12 +380,18 @@ pub async fn export_pdf(
 
     let pdf_path = dir.path().join("document.pdf");
     if !pdf_path.exists() {
-        let combined = format!(
-            "{}\n{}",
-            String::from_utf8_lossy(&out.stdout),
-            String::from_utf8_lossy(&out.stderr)
-        );
-        return Err(format!("PDF generation failed:\n{}", latex_error_summary(&combined)));
+        let log = std::fs::read_to_string(dir.path().join("document.log")).unwrap_or_default();
+        let errors = latex_errors(&log, &tex);
+        return Err(if errors.is_empty() {
+            let combined = format!(
+                "{}\n{}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            );
+            format!("PDF generation failed:\n{}", latex_error_summary(&combined))
+        } else {
+            format_error_report(&errors)
+        });
     }
 
     let chosen = app
@@ -401,6 +407,85 @@ pub async fn export_pdf(
         }
         None => Ok(None),
     }
+}
+
+/// A single LaTeX error, mapped back to the Scripta source where possible.
+#[derive(Debug, PartialEq)]
+pub struct LatexError {
+    pub source_line: Option<u32>, // Scripta source line (via %%% Line marker)
+    pub latex_line: Option<u32>,  // .tex input line (from "l.<n>")
+    pub message: String,          // e.g. "Missing $ inserted."
+    pub snippet: String,          // offending LaTeX text at the error point
+}
+
+/// Scripta source line for `.tex` input line `n` (1-based): the last `%%% Line K`
+/// marker at or before line `n`.
+fn source_line_for(tex_lines: &[&str], n: u32) -> Option<u32> {
+    let upto = (n as usize).min(tex_lines.len());
+    tex_lines[..upto]
+        .iter()
+        .rev()
+        .find_map(|l| l.strip_prefix("%%% Line ").and_then(|s| s.trim().parse::<u32>().ok()))
+}
+
+/// Parse a latexmk/xelatex log + the `.tex` source into structured errors. Each
+/// `! …` line starts an error; the following `l.<n> …` line gives the `.tex`
+/// line and the offending snippet; `%%% Line` markers map it to the source line.
+pub fn latex_errors(log: &str, tex: &str) -> Vec<LatexError> {
+    let tex_lines: Vec<&str> = tex.lines().collect();
+    let log_lines: Vec<&str> = log.lines().collect();
+    let mut errors = Vec::new();
+    let mut i = 0;
+    while i < log_lines.len() {
+        if let Some(msg) = log_lines[i].strip_prefix("! ") {
+            let message = msg.trim().to_string();
+            let mut latex_line = None;
+            let mut snippet = String::new();
+            let mut j = i + 1;
+            while j < log_lines.len() && j < i + 12 {
+                if let Some(rest) = log_lines[j].strip_prefix("l.") {
+                    let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+                    if let Ok(n) = digits.parse::<u32>() {
+                        latex_line = Some(n);
+                        snippet = rest[digits.len()..].trim().to_string();
+                        break;
+                    }
+                }
+                j += 1;
+            }
+            let source_line = latex_line.and_then(|n| source_line_for(&tex_lines, n));
+            errors.push(LatexError { source_line, latex_line, message, snippet });
+            i = j + 1;
+        } else {
+            i += 1;
+        }
+    }
+    errors
+}
+
+/// Human-readable report for the in-app panel; "" when there are no errors.
+pub fn format_error_report(errors: &[LatexError]) -> String {
+    if errors.is_empty() {
+        return String::new();
+    }
+    let n = errors.len();
+    let mut report = format!(
+        "PDF generation failed — {} error{}:\n",
+        n,
+        if n == 1 { "" } else { "s" }
+    );
+    for e in errors {
+        let loc = match (e.source_line, e.latex_line) {
+            (Some(s), _) => format!("Source line {}", s),
+            (None, Some(l)) => format!("LaTeX line {}", l),
+            (None, None) => "Error".to_string(),
+        };
+        report.push_str(&format!("\n• {}: {}", loc, e.message));
+        if !e.snippet.is_empty() {
+            report.push_str(&format!("\n    {}", e.snippet));
+        }
+    }
+    report
 }
 
 #[cfg(test)]
@@ -586,5 +671,59 @@ mod tests {
         let s = latex_error_summary(log);
         assert!(!s.is_empty());
         assert!(s.contains("gamma"));
+    }
+
+    #[test]
+    fn latex_errors_maps_to_source_line() {
+        let tex = "preamble\n%%% Line 5\n\\section{X}\nbody\nmore\nmore\n$s^2$\n";
+        let log = "junk\n! Missing $ inserted.\n<inserted text>\nl.7 $s^2 = 2GM/c\n           more\n";
+        let errs = latex_errors(log, tex);
+        assert_eq!(errs.len(), 1);
+        assert_eq!(errs[0].source_line, Some(5));
+        assert_eq!(errs[0].latex_line, Some(7));
+        assert!(errs[0].message.contains("Missing $ inserted"));
+        assert!(errs[0].snippet.contains("s^2"));
+    }
+
+    #[test]
+    fn latex_errors_two_errors_map_to_nearest_marker() {
+        let tex = "%%% Line 1\na\n%%% Line 9\nb\n";
+        let log = "! First bad.\nl.2 a\n! Second bad.\nl.4 b\n";
+        let errs = latex_errors(log, tex);
+        assert_eq!(errs.len(), 2);
+        assert_eq!(errs[0].source_line, Some(1));
+        assert_eq!(errs[1].source_line, Some(9));
+    }
+
+    #[test]
+    fn latex_errors_no_marker_gives_none() {
+        let errs = latex_errors("! Bad.\nl.2 b\n", "a\nb\nc\n");
+        assert_eq!(errs[0].source_line, None);
+        assert_eq!(errs[0].latex_line, Some(2));
+    }
+
+    #[test]
+    fn latex_errors_ignores_boilerplate() {
+        let log = "LaTeX Font Info: blah\n(/usr/local/texlive/x.sty)\nOverfull \\hbox\n";
+        assert!(latex_errors(log, "x\n").is_empty());
+    }
+
+    #[test]
+    fn format_error_report_empty_is_blank() {
+        assert_eq!(format_error_report(&[]), "");
+    }
+
+    #[test]
+    fn format_error_report_renders_source_line_and_snippet() {
+        let errs = vec![LatexError {
+            source_line: Some(17),
+            latex_line: Some(7),
+            message: "Missing $ inserted.".to_string(),
+            snippet: "s^2".to_string(),
+        }];
+        let r = format_error_report(&errs);
+        assert!(r.contains("Source line 17"));
+        assert!(r.contains("Missing $ inserted."));
+        assert!(r.contains("s^2"));
     }
 }
