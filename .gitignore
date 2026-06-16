@@ -7,6 +7,9 @@ frontend/dist/*
 src-tauri/target/
 src-tauri/gen/
 
+# Transient iconset dir built by `make icon` (cleaned up on success)
+src-tauri/icons/icon.iconset/
+
 # macOS
 .DS_Store
 

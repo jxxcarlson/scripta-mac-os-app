@@ -17,6 +17,9 @@ test-elm:
 test-rust:
 	cd src-tauri && cargo test
 
+# Regenerate the app icon set from icon.svg (requires rsvg-convert).
+# The generated icon.png/.icns + PNG sizes are committed so `make build`
+# works without rsvg-convert installed; re-run this after editing icon.svg.
 icon:
 	cd src-tauri/icons && \
 	rsvg-convert -w 1024 -h 1024 icon.svg -o icon.png && \
