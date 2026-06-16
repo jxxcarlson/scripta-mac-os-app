@@ -1,0 +1,50 @@
+module FlagsTest exposing (suite)
+
+import Expect
+import Flags
+import Json.Encode as E
+import Test exposing (Test, describe, test)
+
+
+suite : Test
+suite =
+    describe "Flags.decode"
+        [ test "decodes a full flags object" <|
+            \_ ->
+                let
+                    v =
+                        E.object [ ( "lastVault", E.string "/Users/me/vault" ), ( "readerMode", E.bool True ) ]
+
+                    f =
+                        Flags.decode v
+                in
+                Expect.equal ( Just "/Users/me/vault", True ) ( f.lastVault, f.readerMode )
+        , test "missing lastVault decodes to Nothing" <|
+            \_ ->
+                let
+                    f =
+                        Flags.decode (E.object [ ( "readerMode", E.bool False ) ])
+                in
+                Expect.equal Nothing f.lastVault
+        , test "null lastVault decodes to Nothing" <|
+            \_ ->
+                let
+                    f =
+                        Flags.decode (E.object [ ( "lastVault", E.null ), ( "readerMode", E.bool False ) ])
+                in
+                Expect.equal Nothing f.lastVault
+        , test "missing/garbage readerMode defaults to False" <|
+            \_ ->
+                let
+                    f =
+                        Flags.decode (E.object [ ( "readerMode", E.string "yes" ) ])
+                in
+                Expect.equal False f.readerMode
+        , test "a non-object value yields defaults" <|
+            \_ ->
+                let
+                    f =
+                        Flags.decode (E.int 5)
+                in
+                Expect.equal ( Nothing, False ) ( f.lastVault, f.readerMode )
+        ]
