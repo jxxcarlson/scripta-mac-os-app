@@ -1,4 +1,4 @@
-module PathUtil exposing (basename, parentDir)
+module PathUtil exposing (basename, parentDir, siblingPath)
 
 {-| Small '/'-separated path helpers shared by the file-open logic.
 -}
@@ -21,3 +21,22 @@ parentDir path =
 
         [] ->
             ""
+
+
+{-| Path of a file named `fileName` placed in the same folder as `reference`
+(the open document, if any). No reference, or a reference at the vault root,
+yields `fileName` itself; a nested reference yields `<folder>/<fileName>`.
+-}
+siblingPath : Maybe String -> String -> String
+siblingPath reference fileName =
+    case reference of
+        Nothing ->
+            fileName
+
+        Just ref ->
+            case parentDir ref of
+                "" ->
+                    fileName
+
+                dir ->
+                    dir ++ "/" ++ fileName
