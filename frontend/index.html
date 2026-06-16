@@ -141,7 +141,12 @@
       const { listen } = window.__TAURI__.event;
 
       // --- Boot Elm ---
-      const app = Elm.Main.init({ node: document.getElementById('app') });
+      function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+      const flags = {
+        lastVault: lsGet('lastVault'),               // string | null
+        readerMode: lsGet('readerMode') === 'true'   // bool
+      };
+      const app = Elm.Main.init({ node: document.getElementById('app'), flags: flags });
 
       // FS request bridge: Elm -> invoke -> Elm
       app.ports.fsRequest.subscribe(async (req) => {
@@ -180,6 +185,13 @@
           folders = raw ? JSON.parse(raw) : [];
         } catch (e) { folders = []; }
         app.ports.gotOpenFolders.send(folders);
+      });
+
+      app.ports.saveReaderMode.subscribe((on) => {
+        try { localStorage.setItem('readerMode', on ? 'true' : 'false'); } catch (e) {}
+      });
+      app.ports.saveLastVault.subscribe((vault) => {
+        try { localStorage.setItem('lastVault', vault); } catch (e) {}
       });
     </script>
   </body>
