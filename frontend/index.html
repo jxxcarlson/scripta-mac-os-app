@@ -162,47 +162,62 @@
       };
       const app = Elm.Main.init({ node: document.getElementById('app'), flags: flags });
 
+      // Port guards: Elm dead-code-eliminates an unused port, so app.ports[name]
+      // can be undefined. Calling .subscribe/.send on it would throw and abort the
+      // rest of this boot script (which silently disabled features once before).
+      // Guard every access: skip + warn instead of throwing.
+      function subscribePort(name, handler) {
+        const p = app.ports && app.ports[name];
+        if (p && typeof p.subscribe === 'function') p.subscribe(handler);
+        else console.warn('Elm port unavailable, skipping subscribe:', name);
+      }
+      function sendPort(name, payload) {
+        const p = app.ports && app.ports[name];
+        if (p && typeof p.send === 'function') p.send(payload);
+        else console.warn('Elm port unavailable, skipping send:', name);
+      }
+
       // FS request bridge: Elm -> invoke -> Elm
-      app.ports.fsRequest.subscribe(async (req) => {
+      subscribePort('fsRequest', async (req) => {
         try {
           const result = await invoke(req.op, req.args || {});
-          app.ports.fsResponse.send({ requestId: req.requestId, ok: true, result });
+          sendPort('fsResponse', { requestId: req.requestId, ok: true, result });
         } catch (e) {
-          app.ports.fsResponse.send({ requestId: req.requestId, ok: false, error: String(e) });
+          sendPort('fsResponse', { requestId: req.requestId, ok: false, error: String(e) });
         }
       });
 
       // Watcher events: Rust -> Elm
       listen('file-changed', (e) => {
-        app.ports.fileChanged.send(e.payload);
+        sendPort('fileChanged', e.payload);
       });
 
       // open-file events forwarded by the single-instance plugin: Rust -> Elm
       listen('open-file', (e) => {
-        app.ports.openFile.send(e.payload);
+        sendPort('openFile', e.payload);
       });
 
       // Per-vault open-folder persistence in localStorage
-      app.ports.saveOpenFolders.subscribe(({ vault, folders }) => {
+      subscribePort('saveOpenFolders', ({ vault, folders }) => {
         try { localStorage.setItem('openFolders:' + vault, JSON.stringify(folders)); } catch (e) {}
       });
-      app.ports.requestOpenFolders.subscribe((vault) => {
+      subscribePort('requestOpenFolders', (vault) => {
         let folders = [];
         try {
           const raw = localStorage.getItem('openFolders:' + vault);
           folders = raw ? JSON.parse(raw) : [];
         } catch (e) { folders = []; }
-        app.ports.gotOpenFolders.send(folders);
+        sendPort('gotOpenFolders', folders);
       });
 
-      app.ports.saveReaderMode.subscribe((on) => {
+      subscribePort('saveReaderMode', (on) => {
         try { localStorage.setItem('readerMode', on ? 'true' : 'false'); } catch (e) {}
       });
-      app.ports.saveLastVault.subscribe((vault) => {
+      subscribePort('saveLastVault', (vault) => {
         invoke('set_last_vault', { vault: vault }).catch(() => {});
       });
 
-      app.ports.scrollAndHighlight.subscribe((id) => {
+      subscribePort('scrollAndHighlight', (id) => {
         const el = document.getElementById(id);
         if (!el) return;
         el.scrollIntoView({ block: 'center', behavior: 'smooth' });
