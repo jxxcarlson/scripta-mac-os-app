@@ -181,6 +181,14 @@ update msg model =
         NoOpFromRender ->
             ( model, Cmd.none )
 
+        GotRenderMsg renderMsg ->
+            case renderMsg of
+                Render.ScrollTo id ->
+                    ( model, FileOps.scrollAndHighlight id )
+
+                _ ->
+                    ( model, Cmd.none )
+
         DismissError ->
             ( { model | error = Nothing }, Cmd.none )
 

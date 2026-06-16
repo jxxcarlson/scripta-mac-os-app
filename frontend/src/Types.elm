@@ -3,6 +3,7 @@ module Types exposing (Model, Msg(..), PendingOp(..), Pane(..))
 import Dict exposing (Dict)
 import Json.Decode as D
 import Language
+import Render
 import SaveState
 import Scripta
 import Set exposing (Set)
@@ -62,6 +63,7 @@ type Msg
     | GotFileChanged D.Value
     | DismissError
     | NoOpFromRender
+    | GotRenderMsg Render.RenderMsg
     | EditorChanged String
     | DebounceFired Int
     | GotSaveResult Int
