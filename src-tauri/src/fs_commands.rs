@@ -312,22 +312,36 @@ pub fn set_last_vault(app: tauri::AppHandle, vault: String) -> Result<(), String
 }
 
 /// A concise, human-readable error from a latexmk/pdflatex run for the UI banner:
-/// the first LaTeX error line ("! ...") plus the following line, else a tail of the output.
+/// the first LaTeX error line ("! ...") through the source-location line
+/// ("l.<n> ...") and the line after it (which shows where on that line the engine
+/// choked), so the user can see the offending source. Falls back to a tail of the
+/// output when there is no "! " error line.
 pub fn latex_error_summary(output: &str) -> String {
     let lines: Vec<&str> = output.lines().collect();
-    if let Some(i) = lines.iter().position(|l| l.starts_with("! ")) {
-        let mut msg = lines[i].to_string();
-        if let Some(next) = lines.get(i + 1) {
-            if !next.trim().is_empty() {
-                msg.push('\n');
-                msg.push_str(next);
+    match lines.iter().position(|l| l.starts_with("! ")) {
+        Some(start) => {
+            let mut collected: Vec<&str> = Vec::new();
+            let mut just_saw_location = false;
+            for line in &lines[start..] {
+                collected.push(line);
+                if just_saw_location {
+                    break; // include one line after "l.<n> ..." then stop
+                }
+                let is_location = line.starts_with("l.")
+                    && line[2..].chars().next().is_some_and(|c| c.is_ascii_digit());
+                if is_location {
+                    just_saw_location = true;
+                } else if collected.len() >= 8 {
+                    break; // cap when no location line is found
+                }
             }
+            collected.join("\n").trim_end().to_string()
         }
-        msg
-    } else {
-        let mut tail: Vec<&str> = lines.iter().rev().take(8).cloned().collect();
-        tail.reverse();
-        tail.join("\n")
+        None => {
+            let mut tail: Vec<&str> = lines.iter().rev().take(8).cloned().collect();
+            tail.reverse();
+            tail.join("\n")
+        }
     }
 }
 
@@ -549,12 +563,21 @@ mod tests {
     }
 
     #[test]
-    fn latex_error_summary_extracts_bang_line() {
-        let log = "noise\n! Undefined control sequence.\nl.42 \\foo\ntrailing";
-        assert_eq!(
-            latex_error_summary(log),
-            "! Undefined control sequence.\nl.42 \\foo"
-        );
+    fn latex_error_summary_includes_location_and_following_line() {
+        let log = "preamble noise\n! Missing $ inserted.\n<inserted text> \n                $\nl.247 This is \\pi\n               trailing source\nmore log after";
+        let s = latex_error_summary(log);
+        assert!(s.starts_with("! Missing $ inserted."));
+        assert!(s.contains("l.247 This is \\pi"));
+        assert!(s.contains("trailing source"));
+        assert!(!s.contains("more log after"));
+    }
+
+    #[test]
+    fn latex_error_summary_without_location_keeps_bang_line() {
+        let log = "x\n! Some error.\ndetail one\ndetail two";
+        let s = latex_error_summary(log);
+        assert!(s.starts_with("! Some error."));
+        assert!(s.contains("detail one"));
     }
 
     #[test]
