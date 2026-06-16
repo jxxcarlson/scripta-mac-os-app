@@ -1,7 +1,8 @@
 module Flags exposing (Flags, decode)
 
-{-| App-launch preferences read from localStorage (via JS) as a JSON value.
-Decoding is tolerant: any missing or malformed field falls back to a default.
+{-| App-launch preferences passed in from JS as a JSON value (`lastVault` from a
+Rust-owned file, `readerMode` from localStorage). Decoding is tolerant: any
+missing or malformed field falls back to a default.
 -}
 
 import Json.Decode as D
