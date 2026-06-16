@@ -26,6 +26,8 @@ pub fn run() {
             fs_commands::watch_workspace,
             fs_commands::export_save,
             fs_commands::take_launch_file,
+            fs_commands::get_last_vault,
+            fs_commands::set_last_vault,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

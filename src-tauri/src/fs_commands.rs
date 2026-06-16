@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::Emitter;
+use tauri::Manager;
 use walkdir::WalkDir;
 
 #[derive(Default)]
@@ -270,6 +271,46 @@ pub fn take_launch_file(state: tauri::State<'_, LaunchFile>) -> Result<Option<St
     Ok(guard.take())
 }
 
+/// Read the remembered last-vault path from `file`; None if absent or blank.
+pub fn read_last_vault(file: &Path) -> Option<String> {
+    match std::fs::read_to_string(file) {
+        Ok(s) => {
+            let t = s.trim();
+            if t.is_empty() {
+                None
+            } else {
+                Some(t.to_string())
+            }
+        }
+        Err(_) => None,
+    }
+}
+
+/// Persist `vault` to `file`, creating parent directories as needed.
+pub fn write_last_vault(file: &Path, vault: &str) -> std::io::Result<()> {
+    if let Some(parent) = file.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(file, vault)
+}
+
+fn last_vault_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    Ok(dir.join("last_vault.txt"))
+}
+
+/// The remembered last-used vault path, if any.
+#[tauri::command]
+pub fn get_last_vault(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    Ok(read_last_vault(&last_vault_file(&app)?))
+}
+
+/// Remember `vault` as the last-used vault.
+#[tauri::command]
+pub fn set_last_vault(app: tauri::AppHandle, vault: String) -> Result<(), String> {
+    write_last_vault(&last_vault_file(&app)?, &vault).map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -405,5 +446,27 @@ mod tests {
             launch_file_from_args(&args),
             Some("/tmp/x/ghost.scripta".to_string())
         );
+    }
+
+    #[test]
+    fn last_vault_round_trips_and_creates_parent() {
+        let dir = tempdir().unwrap();
+        let f = dir.path().join("sub/last_vault.txt");
+        write_last_vault(&f, "/Users/me/My Vault").unwrap();
+        assert_eq!(read_last_vault(&f), Some("/Users/me/My Vault".to_string()));
+    }
+
+    #[test]
+    fn last_vault_missing_file_is_none() {
+        let dir = tempdir().unwrap();
+        assert_eq!(read_last_vault(&dir.path().join("nope.txt")), None);
+    }
+
+    #[test]
+    fn last_vault_whitespace_only_is_none() {
+        let dir = tempdir().unwrap();
+        let f = dir.path().join("last_vault.txt");
+        write_last_vault(&f, "   \n").unwrap();
+        assert_eq!(read_last_vault(&f), None);
     }
 }
