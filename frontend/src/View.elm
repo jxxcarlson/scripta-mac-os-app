@@ -15,39 +15,44 @@ import Types exposing (Model, Msg(..))
 import Workspace exposing (Node(..))
 
 
+treeColumn : Model -> Html Msg
+treeColumn model =
+    div [ style "width" "260px", style "border-right" "1px solid #ddd", style "padding" "8px", style "overflow" "auto" ]
+        (button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
+            :: errorBanner model
+            ++ [ searchBox model
+               , fileTree model
+               , div [ style "font-size" "12px", style "color" "#666", style "margin-top" "6px" ]
+                    [ text (saveLabel model.saveState.saveStatus) ]
+               , div [ style "margin-top" "8px" ]
+                    [ Html.input
+                        [ Html.Attributes.placeholder "new-file-name"
+                        , Html.Attributes.value model.newName
+                        , onInput SetNewName
+                        , style "width" "150px"
+                        ]
+                        []
+                    , button [ onClick ClickedNewFile ] [ text "New" ]
+                    , button [ onClick ClickedRename ] [ text "Rename" ]
+                    ]
+               , div [ style "margin-top" "4px" ]
+                    [ button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
+                    , button [ onClick ClickedChangeVault ] [ text "Change Vault" ]
+                    ]
+               , div [ style "margin-top" "4px" ]
+                    [ button [ onClick ClickedExportHtml ] [ text "Export HTML" ]
+                    , button [ onClick ClickedExportLatex ] [ text "Export LaTeX" ]
+                    ]
+               ]
+        )
+
+
 view : Model -> Html Msg
 view model =
     let
         threePaneRow =
             div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
-                [ div [ style "width" "260px", style "border-right" "1px solid #ddd", style "padding" "8px", style "overflow" "auto" ]
-                    (button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
-                        :: errorBanner model
-                        ++ [ searchBox model
-                           , fileTree model
-                           , div [ style "font-size" "12px", style "color" "#666", style "margin-top" "6px" ]
-                                [ text (saveLabel model.saveState.saveStatus) ]
-                           , div [ style "margin-top" "8px" ]
-                                [ Html.input
-                                    [ Html.Attributes.placeholder "new-file-name"
-                                    , Html.Attributes.value model.newName
-                                    , onInput SetNewName
-                                    , style "width" "150px"
-                                    ]
-                                    []
-                                , button [ onClick ClickedNewFile ] [ text "New" ]
-                                , button [ onClick ClickedRename ] [ text "Rename" ]
-                                ]
-                           , div [ style "margin-top" "4px" ]
-                                [ button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
-                                , button [ onClick ClickedChangeVault ] [ text "Change Vault" ]
-                                ]
-                           , div [ style "margin-top" "4px" ]
-                                [ button [ onClick ClickedExportHtml ] [ text "Export HTML" ]
-                                , button [ onClick ClickedExportLatex ] [ text "Export LaTeX" ]
-                                ]
-                           ]
-                    )
+                [ treeColumn model
                 , Html.node "codemirror-editor"
                     [ Html.Attributes.attribute "text" model.loadedContent
                     , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
@@ -84,13 +89,54 @@ view model =
                 ]
 
         readerView =
-            div
-                [ Html.Attributes.id Editor.renderedTextId
-                , style "flex" "1"
-                , style "padding" "16px"
-                , style "overflow" "auto"
-                ]
-                (previewBody model)
+            let
+                ( bodyContent, tocCols ) =
+                    case ( model.language, model.parsedDoc ) of
+                        ( Just Language.Scripta, Just doc ) ->
+                            let
+                                out =
+                                    Render.renderDocument model.isLight model.contentWidth doc
+
+                                bodyHtml =
+                                    (out.title :: out.body)
+                                        |> List.map (Html.map (\_ -> NoOpFromRender))
+
+                                tocCol =
+                                    if List.isEmpty out.toc then
+                                        []
+
+                                    else
+                                        [ div
+                                            [ style "width" "220px"
+                                            , style "flex" "0 0 auto"
+                                            , style "border-left" "1px solid #ddd"
+                                            , style "padding" "16px"
+                                            , style "overflow" "auto"
+                                            ]
+                                            (List.map (Html.map GotRenderMsg) out.toc)
+                                        ]
+                            in
+                            ( bodyHtml, tocCol )
+
+                        _ ->
+                            ( previewBody model, [] )
+            in
+            div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
+                ([ treeColumn model
+                 , div
+                    [ style "flex" "1"
+                    , style "padding" "16px"
+                    , style "overflow" "auto"
+                    ]
+                    [ div
+                        [ Html.Attributes.id Editor.renderedTextId
+                        , style "max-width" "4.5in"
+                        ]
+                        bodyContent
+                    ]
+                 ]
+                    ++ tocCols
+                )
 
         body =
             if model.readerMode then
@@ -178,6 +224,7 @@ searchBox model =
         , style "width" "100%"
         , style "box-sizing" "border-box"
         , style "margin-bottom" "8px"
+        , style "margin-top" "1mm"
         ]
         []
 
