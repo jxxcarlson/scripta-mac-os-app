@@ -354,8 +354,11 @@ pub async fn export_pdf(
     let tex_path = dir.path().join("document.tex");
     std::fs::write(&tex_path, &tex).map_err(|e| e.to_string())?;
 
+    // xelatex (not pdflatex): the Scripta LaTeX export can contain literal Unicode
+    // (e.g. π), which pdflatex cannot typeset without inputenc setup; xelatex is a
+    // Unicode engine and compiles the same preamble cleanly.
     let out = std::process::Command::new("latexmk")
-        .args(["-pdf", "-interaction=nonstopmode", "-halt-on-error", "document.tex"])
+        .args(["-xelatex", "-interaction=nonstopmode", "-halt-on-error", "document.tex"])
         .current_dir(dir.path())
         .env("PATH", tex_path_env())
         .output()
