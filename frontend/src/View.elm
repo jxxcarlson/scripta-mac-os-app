@@ -18,7 +18,7 @@ import Workspace exposing (Node(..))
 
 treeColumn : Model -> Html Msg
 treeColumn model =
-    div [ style "width" "260px", style "border-right" "1px solid #ddd", style "padding" "8px", style "overflow" "auto" ]
+    div [ style "width" "calc(260px + 2mm)", style "border-right" "1px solid #ddd", style "padding" "8px", style "overflow" "auto" ]
         (button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
             :: errorBanner model
             ++ [ searchBox model
