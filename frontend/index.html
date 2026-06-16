@@ -92,7 +92,7 @@
   <body>
     <div id="app"></div>
     <script src="dist/elm.js"></script>
-    <script>
+    <script type="module">
       // --- math-text custom element (pasted verbatim from scripta-app-v4) ---
       class MathText extends HTMLElement {
           static get observedAttributes() { return ['content', 'display']; }
@@ -154,8 +154,10 @@
 
       // --- Boot Elm ---
       function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+      let lastVault = null;
+      try { lastVault = await invoke('get_last_vault'); } catch (e) { lastVault = null; }
       const flags = {
-        lastVault: lsGet('lastVault'),               // string | null
+        lastVault: lastVault,                        // string | null (from Rust)
         readerMode: lsGet('readerMode') === 'true'   // bool
       };
       const app = Elm.Main.init({ node: document.getElementById('app'), flags: flags });
@@ -203,7 +205,7 @@
         try { localStorage.setItem('readerMode', on ? 'true' : 'false'); } catch (e) {}
       });
       app.ports.saveLastVault.subscribe((vault) => {
-        try { localStorage.setItem('lastVault', vault); } catch (e) {}
+        invoke('set_last_vault', { vault: vault }).catch(() => {});
       });
 
       app.ports.scrollAndHighlight.subscribe((id) => {
