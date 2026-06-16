@@ -3,6 +3,7 @@ port module FileOps exposing
     , fsRequest, fsResponse, fileChanged, openFile
     , scrollToElement
     , saveOpenFolders, requestOpenFolders, gotOpenFolders
+    , saveReaderMode, saveLastVault
     , encodeRequest, responseDecoder, resultOf
     , send
     )
@@ -38,6 +39,12 @@ port requestOpenFolders : String -> Cmd msg
 
 
 port gotOpenFolders : (E.Value -> msg) -> Sub msg
+
+
+port saveReaderMode : Bool -> Cmd msg
+
+
+port saveLastVault : String -> Cmd msg
 
 
 type alias FsResponse =

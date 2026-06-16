@@ -4,6 +4,7 @@ import Browser
 import Dict
 import Export
 import FileOps
+import Flags
 import Json.Decode as D
 import Json.Encode as E
 import Language
@@ -20,7 +21,7 @@ import View
 import Workspace
 
 
-main : Program () Model Msg
+main : Program D.Value Model Msg
 main =
     Browser.element
         { init = init
@@ -30,8 +31,12 @@ main =
         }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
+init : D.Value -> ( Model, Cmd Msg )
+init flagsValue =
+    let
+        flags =
+            Flags.decode flagsValue
+    in
     request PLaunchFile
         "take_launch_file"
         []
@@ -53,6 +58,8 @@ init _ =
         , newName = ""
         , openFolders = Set.empty
         , searchQuery = ""
+        , readerMode = flags.readerMode
+        , initialLastVault = flags.lastVault
         }
 
 
@@ -69,6 +76,31 @@ request op cmdName args model =
     )
 
 
+{-| Open a folder as the vault: list + watch it, restore its remembered open
+folders, and persist it as the last-used vault. Clears any open document.
+-}
+openVault : String -> Model -> ( Model, Cmd Msg )
+openVault root model =
+    let
+        m0 =
+            { model
+                | vaultRoot = Just root
+                , selectedPath = Nothing
+                , content = ""
+                , loadedContent = ""
+                , parsedDoc = Nothing
+                , openFolders = Set.empty
+            }
+
+        ( m1, c1 ) =
+            request PListWorkspace "list_workspace" [ ( "root", E.string root ) ] m0
+
+        ( m2, c2 ) =
+            request PNoop "watch_workspace" [ ( "root", E.string root ) ] m1
+    in
+    ( m2, Cmd.batch [ c1, c2, FileOps.requestOpenFolders root, FileOps.saveLastVault root ] )
+
+
 {-| Open an absolute file path: make its parent folder the vault, watch + list
 that folder, and read the file (whose workspace-relative path is its basename).
 -}
@@ -81,24 +113,16 @@ openExternalFile abs model =
         name =
             PathUtil.basename abs
 
-        m0 =
-            { model
-                | vaultRoot = Just parent
-                , selectedPath = Just name
-                , language = Language.fromPath name
-                , openFolders = Set.empty
-            }
-
         ( m1, c1 ) =
-            request PListWorkspace "list_workspace" [ ( "root", E.string parent ) ] m0
+            openVault parent model
 
-        ( m2, c2 ) =
-            request PNoop "watch_workspace" [ ( "root", E.string parent ) ] m1
+        m2 =
+            { m1 | selectedPath = Just name, language = Language.fromPath name }
 
         ( m3, c3 ) =
             request (PReadFile name) "read_file" [ ( "root", E.string parent ), ( "path", E.string name ) ] m2
     in
-    ( m3, Cmd.batch [ c1, c2, c3, FileOps.requestOpenFolders parent ] )
+    ( m3, Cmd.batch [ c1, c3 ] )
 
 
 saveOpenFoldersCmd : Maybe String -> Set.Set String -> Cmd Msg
@@ -327,6 +351,13 @@ update msg model =
         SetSearchQuery q ->
             ( { model | searchQuery = q }, Cmd.none )
 
+        ToggledReaderMode ->
+            let
+                rm =
+                    not model.readerMode
+            in
+            ( { model | readerMode = rm }, FileOps.saveReaderMode rm )
+
         GotOpenFile value ->
             case D.decodeValue (D.field "path" D.string) value of
                 Ok abs ->
@@ -369,14 +400,7 @@ handleResponse op resp model =
                 PPickWorkspace ->
                     case D.decodeValue (D.nullable D.string) result of
                         Ok (Just root) ->
-                            let
-                                ( m1, c1 ) =
-                                    request PListWorkspace "list_workspace" [ ( "root", E.string root ) ] { model | vaultRoot = Just root, openFolders = Set.empty }
-
-                                ( m2, c2 ) =
-                                    request PNoop "watch_workspace" [ ( "root", E.string root ) ] m1
-                            in
-                            ( m2, Cmd.batch [ c1, c2, FileOps.requestOpenFolders root ] )
+                            openVault root model
 
                         Ok Nothing ->
                             -- user cancelled the folder picker
@@ -450,7 +474,12 @@ handleResponse op resp model =
                             openExternalFile abs model
 
                         _ ->
-                            ( model, Cmd.none )
+                            case model.initialLastVault of
+                                Just vault ->
+                                    openVault vault model
+
+                                Nothing ->
+                                    ( model, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg
