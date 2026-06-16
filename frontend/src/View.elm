@@ -224,7 +224,7 @@ searchBox model =
         , style "width" "100%"
         , style "box-sizing" "border-box"
         , style "margin-bottom" "8px"
-        , style "margin-top" "1mm"
+        , style "margin-top" "8px"
         ]
         []
 
@@ -239,33 +239,43 @@ fileTree model =
             String.trim model.searchQuery
     in
     if String.isEmpty q then
-        treeView False model.openFolders model.tree
+        treeView False model.selectedPath model.openFolders model.tree
 
     else
-        treeView True model.openFolders (Workspace.filter q model.tree)
+        treeView True model.selectedPath model.openFolders (Workspace.filter q model.tree)
 
 
-treeView : Bool -> Set String -> List Node -> Html Msg
-treeView forceOpen openFolders nodes =
+treeView : Bool -> Maybe String -> Set String -> List Node -> Html Msg
+treeView forceOpen selectedPath openFolders nodes =
     ul
         [ style "list-style" "none"
         , style "padding-left" "12px"
         , style "font-size" "13px"
         ]
-        (List.map (nodeView forceOpen openFolders) nodes)
+        (List.map (nodeView forceOpen selectedPath openFolders) nodes)
 
 
-nodeView : Bool -> Set String -> Node -> Html Msg
-nodeView forceOpen openFolders node =
+nodeView : Bool -> Maybe String -> Set String -> Node -> Html Msg
+nodeView forceOpen selectedPath openFolders node =
     case node of
         FileNode r ->
             li
-                [ onClick (ClickedTreeNode r.path)
-                , style "cursor" "pointer"
-                , style "margin-bottom" "4px"
-                , style "display" "flex"
-                , style "align-items" "flex-start"
-                ]
+                ([ onClick (ClickedTreeNode r.path)
+                 , style "cursor" "pointer"
+                 , style "margin-bottom" "4px"
+                 , style "display" "flex"
+                 , style "align-items" "flex-start"
+                 ]
+                    ++ (if Just r.path == selectedPath then
+                            [ style "background-color" "#cfe6fb"
+                            , style "border-radius" "3px"
+                            , style "padding" "0 4px"
+                            ]
+
+                        else
+                            []
+                       )
+                )
                 [ span [ style "flex" "0 0 auto", style "margin-right" "5px" ] [ text "-" ]
                 , span [ style "flex" "1 1 auto" ] [ text r.name ]
                 ]
@@ -287,7 +297,7 @@ nodeView forceOpen openFolders node =
                     , span [ style "flex" "1 1 auto" ] [ text r.name ]
                     ]
                     :: (if isOpen then
-                            [ treeView forceOpen openFolders r.children ]
+                            [ treeView forceOpen selectedPath openFolders r.children ]
 
                         else
                             []
