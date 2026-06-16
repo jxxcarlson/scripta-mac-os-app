@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Mac Scripta Viewer",
+  "productName": "Scripta",
   "version": "0.1.0",
   "identifier": "io.scripta.viewer",
   "build": {
@@ -10,7 +10,7 @@
   },
   "app": {
     "windows": [
-      { "title": "Mac Scripta Viewer", "width": 1200, "height": 800 }
+      { "title": "Scripta", "width": 1200, "height": 800 }
     ],
     "security": { "csp": null },
     "withGlobalTauri": true
