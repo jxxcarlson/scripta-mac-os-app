@@ -66,7 +66,7 @@
       button:hover, .cm-button:hover { background: #4a4e55; }
 
       .lr-sync-highlight {
-        background-color: #fff2a8;
+        background-color: #cfe6fb;
         transition: background-color 0.2s ease;
         border-radius: 2px;
       }
@@ -259,6 +259,21 @@
         if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
           e.preventDefault();
           lrSync();
+        }
+      }, true);
+
+      // Esc: clear sync highlighting in both the rendered text and the editor.
+      // (CodeMirror's own Esc keymap collapses any active text selection.)
+      window.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          document.querySelectorAll('.lr-sync-highlight, .toc-sync-highlight').forEach(function (n) {
+            n.classList.remove('lr-sync-highlight');
+            n.classList.remove('toc-sync-highlight');
+          });
+          var elc = document.querySelector('codemirror-editor');
+          if (elc && elc.editor && elc.clearSyncHighlight) {
+            elc.editor.dispatch({ effects: elc.clearSyncHighlight() });
+          }
         }
       }, true);
     </script>
