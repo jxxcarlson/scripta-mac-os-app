@@ -265,7 +265,7 @@ update msg model =
                 Just root ->
                     let
                         path =
-                            ensureScriptaExt model.newName
+                            PathUtil.siblingPath model.selectedPath (ensureScriptaExt model.newName)
                     in
                     if String.isEmpty (String.trim model.newName) then
                         ( model, Cmd.none )
