@@ -65,6 +65,12 @@
       }
       button:hover, .cm-button:hover { background: #4a4e55; }
 
+      .lr-sync-highlight {
+        background-color: #fff2a8;
+        transition: background-color 0.2s ease;
+        border-radius: 2px;
+      }
+
       /* CodeMirror search-panel buttons: CM's baseTheme sets color:inherit (dark
          panel text) and a dark gradient background, injected at runtime, so it
          wins the cascade. Force light-on-charcoal to match the app buttons. */
@@ -193,6 +199,56 @@
       app.ports.saveLastVault.subscribe((vault) => {
         try { localStorage.setItem('lastVault', vault); } catch (e) {}
       });
+
+      // Ctrl-S / Cmd-S: left-to-right sync. Find the rendered element for the
+      // editor's cursor line, scroll it into view, and highlight it.
+      function lrParseLine(id) {
+        if (!id) return null;
+        if (id.indexOf('e-') === 0) {            // expression id "e-N.T" (0-indexed line)
+          var n = parseInt(id.substring(2).split('.')[0], 10);
+          return isNaN(n) ? null : n;
+        }
+        var parts = id.split('-');               // block id "N-I" (0-indexed line)
+        if (parts.length >= 2) {
+          var m = parseInt(parts[0], 10);
+          return isNaN(m) ? null : m;
+        }
+        return null;
+      }
+
+      function lrSync() {
+        var elc = document.querySelector('codemirror-editor');
+        var ed = elc && elc.editor;
+        if (!ed) return;
+        var pos = ed.state.selection.main.head;
+        var line0 = ed.state.doc.lineAt(pos).number - 1; // 0-indexed
+        var rendered = document.getElementById('__RENDERED_TEXT__');
+        if (!rendered) return;
+
+        var nodes = rendered.querySelectorAll('[id]');
+        var exact = null, best = null, bestLine = -1;
+        for (var i = 0; i < nodes.length; i++) {
+          var ln = lrParseLine(nodes[i].id);
+          if (ln === null) continue;
+          if (ln === line0) { exact = nodes[i]; break; }
+          if (ln <= line0 && ln > bestLine) { best = nodes[i]; bestLine = ln; }
+        }
+        var target = exact || best;
+        if (!target) return;
+
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        document.querySelectorAll('.lr-sync-highlight').forEach(function (n) {
+          n.classList.remove('lr-sync-highlight');
+        });
+        target.classList.add('lr-sync-highlight');
+      }
+
+      window.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+          e.preventDefault();
+          lrSync();
+        }
+      }, true);
     </script>
   </body>
 </html>
