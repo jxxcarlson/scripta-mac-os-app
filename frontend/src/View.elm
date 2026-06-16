@@ -20,8 +20,7 @@ treeColumn : Model -> Html Msg
 treeColumn model =
     div [ style "width" "calc(260px + 2mm)", style "border-right" "1px solid #ddd", style "padding" "8px", style "overflow" "auto" ]
         (button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
-            :: errorBanner model
-            ++ [ searchBox model
+            :: [ searchBox model
                , fileTree model
                , div [ style "font-size" "12px", style "color" "#666", style "margin-top" "6px" ]
                     [ text (saveLabel model.saveState.saveStatus) ]
@@ -148,7 +147,7 @@ view model =
                 threePaneRow
     in
     div [ style "display" "flex", style "flex-direction" "column", style "height" "100vh", style "font-family" "system-ui" ]
-        (conflictBanner model ++ [ toolbar, body ])
+        (conflictBanner model ++ errorBanner model ++ [ toolbar, body ])
 
 
 conflictBanner : Model -> List (Html Msg)
@@ -183,8 +182,19 @@ errorBanner model =
     case model.error of
         Just e ->
             [ div
-                [ style "background" "#fee", style "color" "#900", style "padding" "6px", onClick DismissError ]
-                [ text ("Error: " ++ e ++ " (click to dismiss)") ]
+                [ style "background" "#fee"
+                , style "color" "#900"
+                , style "padding" "8px"
+                , style "border-bottom" "1px solid #c99"
+                , style "font-family" "ui-monospace, monospace"
+                , style "font-size" "12px"
+                , style "white-space" "pre-wrap"
+                , style "max-height" "35vh"
+                , style "overflow" "auto"
+                , style "cursor" "pointer"
+                , onClick DismissError
+                ]
+                [ text (e ++ "\n\n(click to dismiss)") ]
             ]
 
         Nothing ->
