@@ -25,7 +25,7 @@ treeColumn model =
                , fileTree model
                , div [ style "font-size" "12px", style "color" "#666", style "margin-top" "6px" ]
                     [ text (saveLabel model.saveState.saveStatus) ]
-               , div [ style "margin-top" "8px" ]
+               , div [ style "margin-top" "8px", style "margin-bottom" "2mm", style "display" "flex", style "align-items" "center", style "gap" "2mm" ]
                     [ Html.input
                         [ Html.Attributes.placeholder "new-file-name"
                         , Html.Attributes.value model.newName
@@ -36,11 +36,11 @@ treeColumn model =
                     , button [ onClick ClickedNewFile ] [ text "New" ]
                     , button [ onClick ClickedRename ] [ text "Rename" ]
                     ]
-               , div [ style "margin-top" "4px" ]
+               , div [ style "margin-top" "4px", style "display" "flex", style "gap" "2mm" ]
                     [ button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
                     , button [ onClick ClickedChangeVault ] [ text "Change Vault" ]
                     ]
-               , div [ style "margin-top" "4px" ]
+               , div [ style "margin-top" "4px", style "display" "flex", style "gap" "2mm" ]
                     [ button [ onClick ClickedExportHtml ] [ text "Export HTML" ]
                     , button [ onClick ClickedExportLatex ] [ text "Export LaTeX" ]
                     ]
