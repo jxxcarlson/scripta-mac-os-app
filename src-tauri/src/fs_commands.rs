@@ -443,6 +443,9 @@ pub fn latex_errors(log: &str, tex: &str) -> Vec<LatexError> {
             let mut snippet = String::new();
             let mut j = i + 1;
             while j < log_lines.len() && j < i + 12 {
+                if log_lines[j].starts_with("! ") {
+                    break; // next error begins; stop looking for this one's location
+                }
                 if let Some(rest) = log_lines[j].strip_prefix("l.") {
                     let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
                     if let Ok(n) = digits.parse::<u32>() {
@@ -455,7 +458,9 @@ pub fn latex_errors(log: &str, tex: &str) -> Vec<LatexError> {
             }
             let source_line = latex_line.and_then(|n| source_line_for(&tex_lines, n));
             errors.push(LatexError { source_line, latex_line, message, snippet });
-            i = j + 1;
+            // Advance past the location line if found; otherwise only past the error line,
+            // so a following "! " error in the window isn't skipped.
+            i = if latex_line.is_some() { j + 1 } else { i + 1 };
         } else {
             i += 1;
         }
@@ -706,6 +711,17 @@ mod tests {
     fn latex_errors_ignores_boilerplate() {
         let log = "LaTeX Font Info: blah\n(/usr/local/texlive/x.sty)\nOverfull \\hbox\n";
         assert!(latex_errors(log, "x\n").is_empty());
+    }
+
+    #[test]
+    fn latex_errors_first_without_location_does_not_swallow_next() {
+        // First "! " has no l.<n>; the second error must still be parsed correctly.
+        let log = "! First with no location.\n(noise)\n(noise)\n! Second bad.\nl.3 x\n";
+        let tex = "a\nb\n%%% Line 4\nx\n";
+        let errs = latex_errors(log, tex);
+        assert_eq!(errs.len(), 2);
+        assert_eq!(errs[1].latex_line, Some(3));
+        assert_eq!(errs[1].source_line, Some(4));
     }
 
     #[test]
