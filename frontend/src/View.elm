@@ -6,6 +6,7 @@ import Html.Attributes exposing (style)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as D
 import Language
+import PathUtil
 import Render
 import SaveState
 import Set exposing (Set)
@@ -229,6 +230,16 @@ searchBox model =
         []
 
 
+{-| Tree highlight inputs: the open document (pale-blue pill) and the folder a
+new document will land in (lighter-blue fill). `currentFolder` is "" at the
+vault root, which matches no folder node.
+-}
+type alias Highlights =
+    { selectedDoc : Maybe String
+    , currentFolder : String
+    }
+
+
 {-| The file tree, filtered to matching documents while a search is active
 (folders containing matches are force-expanded so matches are visible).
 -}
@@ -237,26 +248,34 @@ fileTree model =
     let
         q =
             String.trim model.searchQuery
+
+        highlights =
+            { selectedDoc = model.selectedPath
+            , currentFolder =
+                model.selectedPath
+                    |> Maybe.map PathUtil.parentDir
+                    |> Maybe.withDefault ""
+            }
     in
     if String.isEmpty q then
-        treeView False model.selectedPath model.openFolders model.tree
+        treeView False highlights model.openFolders model.tree
 
     else
-        treeView True model.selectedPath model.openFolders (Workspace.filter q model.tree)
+        treeView True highlights model.openFolders (Workspace.filter q model.tree)
 
 
-treeView : Bool -> Maybe String -> Set String -> List Node -> Html Msg
-treeView forceOpen selectedPath openFolders nodes =
+treeView : Bool -> Highlights -> Set String -> List Node -> Html Msg
+treeView forceOpen highlights openFolders nodes =
     ul
         [ style "list-style" "none"
         , style "padding-left" "12px"
         , style "font-size" "13px"
         ]
-        (List.map (nodeView forceOpen selectedPath openFolders) nodes)
+        (List.map (nodeView forceOpen highlights openFolders) nodes)
 
 
-nodeView : Bool -> Maybe String -> Set String -> Node -> Html Msg
-nodeView forceOpen selectedPath openFolders node =
+nodeView : Bool -> Highlights -> Set String -> Node -> Html Msg
+nodeView forceOpen highlights openFolders node =
     case node of
         FileNode r ->
             li
@@ -266,7 +285,7 @@ nodeView forceOpen selectedPath openFolders node =
                  , style "display" "flex"
                  , style "align-items" "flex-start"
                  ]
-                    ++ (if Just r.path == selectedPath then
+                    ++ (if Just r.path == highlights.selectedDoc then
                             [ style "background-color" "#cfe6fb"
                             , style "border-radius" "3px"
                             , style "padding" "0 4px"
@@ -287,17 +306,27 @@ nodeView forceOpen selectedPath openFolders node =
             in
             li []
                 (div
-                    [ onClick (ToggledFolder r.path)
-                    , style "cursor" "pointer"
-                    , style "margin-bottom" "4px"
-                    , style "display" "flex"
-                    , style "align-items" "flex-start"
-                    ]
+                    ([ onClick (ToggledFolder r.path)
+                     , style "cursor" "pointer"
+                     , style "margin-bottom" "4px"
+                     , style "display" "flex"
+                     , style "align-items" "flex-start"
+                     ]
+                        ++ (if r.path == highlights.currentFolder then
+                                [ style "background-color" "#e8f2fc"
+                                , style "border-radius" "3px"
+                                , style "padding" "0 4px"
+                                ]
+
+                            else
+                                []
+                           )
+                    )
                     [ span [ style "flex" "0 0 auto", style "margin-right" "5px" ] [ folderIcon isOpen ]
                     , span [ style "flex" "1 1 auto" ] [ text r.name ]
                     ]
                     :: (if isOpen then
-                            [ treeView forceOpen selectedPath openFolders r.children ]
+                            [ treeView forceOpen highlights openFolders r.children ]
 
                         else
                             []
