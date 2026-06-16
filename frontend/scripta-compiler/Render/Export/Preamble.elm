@@ -187,8 +187,10 @@ standardPackages =
 \\usepackage{graphicx}    % for \\includegraphics
 
 %% Index, hyperref
-\\usepackage[T1]{fontenc}
-\\usepackage{lmodern}
+%% NOTE: [T1]fontenc + lmodern removed — that 8-bit font has no Greek or
+%% smart-quote glyphs (xelatex silently drops them). The Unicode text + math
+%% fonts are set at the very END of the preamble (see commands), so fontspec
+%% loads after the \\newcommand block and doesn't clash (e.g. \\strong).
 
 \\usepackage{hyperref}   % load before imakeidx
 \\usepackage{imakeidx}
@@ -385,5 +387,13 @@ commands =
 % Spacing
 \\parindent0pt
 \\parskip5pt
+
+%% Unicode text + math fonts (xelatex/lualatex). Loaded LAST so fontspec
+%% (pulled in by unicode-math) defines its commands AFTER the \\newcommand
+%% block above — avoids \\strong / \\eth "already defined" clashes. STIX Two
+%% has the Greek and smart-quote glyphs that Latin Modern lacks.
+\\usepackage{unicode-math}
+\\setmainfont{STIX Two Text}
+\\setmathfont{STIX Two Math}
 
 """
