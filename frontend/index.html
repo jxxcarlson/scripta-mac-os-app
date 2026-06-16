@@ -71,6 +71,12 @@
         border-radius: 2px;
       }
 
+      .toc-sync-highlight {
+        background-color: #cfe6fb;
+        transition: background-color 0.2s ease;
+        border-radius: 2px;
+      }
+
       /* CodeMirror search-panel buttons: CM's baseTheme sets color:inherit (dark
          panel text) and a dark gradient background, injected at runtime, so it
          wins the cascade. Force light-on-charcoal to match the app buttons. */
@@ -198,6 +204,16 @@
       });
       app.ports.saveLastVault.subscribe((vault) => {
         try { localStorage.setItem('lastVault', vault); } catch (e) {}
+      });
+
+      app.ports.scrollAndHighlight.subscribe((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        document.querySelectorAll('.toc-sync-highlight').forEach((n) => {
+          n.classList.remove('toc-sync-highlight');
+        });
+        el.classList.add('toc-sync-highlight');
       });
 
       // Ctrl-S / Cmd-S: left-to-right sync. Find the rendered element for the
