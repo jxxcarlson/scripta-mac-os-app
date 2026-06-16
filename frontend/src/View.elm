@@ -63,9 +63,44 @@ view model =
                     ]
                     (previewBody model)
                 ]
+
+        toolbar =
+            div
+                [ style "display" "flex"
+                , style "align-items" "center"
+                , style "gap" "8px"
+                , style "padding" "6px 8px"
+                , style "border-bottom" "1px solid #ddd"
+                ]
+                [ button [ onClick ToggledReaderMode ]
+                    [ text
+                        (if model.readerMode then
+                            "Exit Reader"
+
+                         else
+                            "Reader"
+                        )
+                    ]
+                ]
+
+        readerView =
+            div
+                [ Html.Attributes.id Editor.renderedTextId
+                , style "flex" "1"
+                , style "padding" "16px"
+                , style "overflow" "auto"
+                ]
+                (previewBody model)
+
+        body =
+            if model.readerMode then
+                readerView
+
+            else
+                threePaneRow
     in
     div [ style "display" "flex", style "flex-direction" "column", style "height" "100vh", style "font-family" "system-ui" ]
-        (conflictBanner model ++ [ threePaneRow ])
+        (conflictBanner model ++ [ toolbar, body ])
 
 
 conflictBanner : Model -> List (Html Msg)
