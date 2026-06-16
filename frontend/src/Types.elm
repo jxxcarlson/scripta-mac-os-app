@@ -46,6 +46,7 @@ type PendingOp
     | PRename String String
     | PDelete String
     | PExportSave
+    | PExportPdf
     | PNoop
     | PLaunchFile
 
@@ -76,6 +77,7 @@ type Msg
     | ClickedKeepMine
     | ClickedExportHtml
     | ClickedExportLatex
+    | ClickedExportPdf
     | GotOpenFile D.Value
     | ToggledFolder String
     | GotOpenFolders D.Value

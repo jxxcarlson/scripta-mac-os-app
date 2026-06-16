@@ -344,6 +344,19 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        ClickedExportPdf ->
+            case model.parsedDoc of
+                Just doc ->
+                    request PExportPdf
+                        "export_pdf"
+                        [ ( "defaultName", E.string (Export.defaultName model.selectedPath ".pdf") )
+                        , ( "tex", E.string (Export.latex model.isLight model.contentWidth doc) )
+                        ]
+                        model
+
+                Nothing ->
+                    ( model, Cmd.none )
+
         ToggledFolder path ->
             let
                 folders =
@@ -474,6 +487,10 @@ handleResponse op resp model =
 
                 PExportSave ->
                     -- File was written by the native save dialog; nothing to update.
+                    ( model, Cmd.none )
+
+                PExportPdf ->
+                    -- PDF written by the native save dialog; errors surface via the Err arm.
                     ( model, Cmd.none )
 
                 PLaunchFile ->

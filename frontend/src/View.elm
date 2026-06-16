@@ -43,6 +43,7 @@ treeColumn model =
                , div [ style "margin-top" "4px", style "display" "flex", style "gap" "2mm" ]
                     [ button [ onClick ClickedExportHtml ] [ text "Export HTML" ]
                     , button [ onClick ClickedExportLatex ] [ text "Export LaTeX" ]
+                    , button [ onClick ClickedExportPdf ] [ text "Export PDF" ]
                     ]
                ]
         )
