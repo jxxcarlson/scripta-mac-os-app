@@ -182,12 +182,6 @@
         app.ports.openFile.send(e.payload);
       });
 
-      // scrollToElement port
-      app.ports.scrollToElement.subscribe((id) => {
-        const el = document.getElementById(id);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-
       // Per-vault open-folder persistence in localStorage
       app.ports.saveOpenFolders.subscribe(({ vault, folders }) => {
         try { localStorage.setItem('openFolders:' + vault, JSON.stringify(folders)); } catch (e) {}

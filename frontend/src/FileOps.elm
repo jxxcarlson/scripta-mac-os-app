@@ -1,7 +1,7 @@
 port module FileOps exposing
     ( FsResponse
     , fsRequest, fsResponse, fileChanged, openFile
-    , scrollToElement, scrollAndHighlight
+    , scrollAndHighlight
     , saveOpenFolders, requestOpenFolders, gotOpenFolders
     , saveReaderMode, saveLastVault
     , encodeRequest, responseDecoder, resultOf
@@ -27,9 +27,6 @@ port fileChanged : (E.Value -> msg) -> Sub msg
 
 
 port openFile : (E.Value -> msg) -> Sub msg
-
-
-port scrollToElement : String -> Cmd msg
 
 
 port saveOpenFolders : E.Value -> Cmd msg
