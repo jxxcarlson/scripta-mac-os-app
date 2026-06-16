@@ -130,7 +130,7 @@ view model =
                     ]
                     [ div
                         [ Html.Attributes.id Editor.renderedTextId
-                        , style "max-width" "4.5in"
+                        , style "max-width" "5.5in"
                         ]
                         bodyContent
                     ]
