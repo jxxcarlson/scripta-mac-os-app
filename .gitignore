@@ -12,3 +12,6 @@ src-tauri/gen/
 
 # Node
 node_modules/
+
+# Superpowers brainstorming companion
+.superpowers/
