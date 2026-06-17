@@ -388,8 +388,17 @@ update msg model =
             let
                 fp =
                     not model.fullParse
+
+                -- Switching to Full: reparse the current content immediately so the
+                -- preview is consistent without waiting for the next edit.
+                reparsed =
+                    if fp && model.language == Just Language.Scripta then
+                        Just (Render.parse model.isLight model.contentWidth model.content)
+
+                    else
+                        model.parsedDoc
             in
-            ( { model | fullParse = fp }, FileOps.saveFullParse fp )
+            ( { model | fullParse = fp, parsedDoc = reparsed }, FileOps.saveFullParse fp )
 
         GotOpenFile value ->
             case D.decodeValue (D.field "path" D.string) value of
