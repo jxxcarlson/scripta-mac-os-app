@@ -87,6 +87,15 @@ view model =
                             "Reader"
                         )
                     ]
+                , button [ onClick ToggledParseMode ]
+                    [ text
+                        (if model.fullParse then
+                            "Parse: Full"
+
+                         else
+                            "Parse: Incremental"
+                        )
+                    ]
                 ]
 
         readerView =

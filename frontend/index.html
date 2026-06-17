@@ -158,7 +158,8 @@
       try { lastVault = await invoke('get_last_vault'); } catch (e) { lastVault = null; }
       const flags = {
         lastVault: lastVault,                        // string | null (from Rust)
-        readerMode: lsGet('readerMode') === 'true'   // bool
+        readerMode: lsGet('readerMode') === 'true',  // bool
+        fullParse: lsGet('fullParse') !== 'false'    // bool (unset → Full)
       };
       const app = Elm.Main.init({ node: document.getElementById('app'), flags: flags });
 
@@ -212,6 +213,9 @@
 
       subscribePort('saveReaderMode', (on) => {
         try { localStorage.setItem('readerMode', on ? 'true' : 'false'); } catch (e) {}
+      });
+      subscribePort('saveFullParse', (on) => {
+        try { localStorage.setItem('fullParse', on ? 'true' : 'false'); } catch (e) {}
       });
       subscribePort('saveLastVault', (vault) => {
         invoke('set_last_vault', { vault: vault }).catch(() => {});

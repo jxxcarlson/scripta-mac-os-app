@@ -30,6 +30,7 @@ type alias Model =
     , openFolders : Set String
     , searchQuery : String
     , readerMode : Bool
+    , fullParse : Bool
     , initialLastVault : Maybe String
     }
 
@@ -83,3 +84,4 @@ type Msg
     | GotOpenFolders D.Value
     | SetSearchQuery String
     | ToggledReaderMode
+    | ToggledParseMode

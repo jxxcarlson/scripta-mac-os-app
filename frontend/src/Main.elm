@@ -59,6 +59,7 @@ init flagsValue =
         , openFolders = Set.empty
         , searchQuery = ""
         , readerMode = flags.readerMode
+        , fullParse = flags.fullParse
         , initialLastVault = flags.lastVault
         }
 
@@ -233,7 +234,11 @@ update msg model =
 
                 reparsed =
                     if model.language == Just Language.Scripta then
-                        Maybe.map (\d -> Scripta.reparse (Render.options model.isLight model.contentWidth) d newText) model.parsedDoc
+                        if model.fullParse then
+                            Just (Render.parse model.isLight model.contentWidth newText)
+
+                        else
+                            Maybe.map (\d -> Scripta.reparse (Render.options model.isLight model.contentWidth) d newText) model.parsedDoc
 
                     else
                         model.parsedDoc
@@ -378,6 +383,13 @@ update msg model =
                     not model.readerMode
             in
             ( { model | readerMode = rm }, FileOps.saveReaderMode rm )
+
+        ToggledParseMode ->
+            let
+                fp =
+                    not model.fullParse
+            in
+            ( { model | fullParse = fp }, FileOps.saveFullParse fp )
 
         GotOpenFile value ->
             case D.decodeValue (D.field "path" D.string) value of
