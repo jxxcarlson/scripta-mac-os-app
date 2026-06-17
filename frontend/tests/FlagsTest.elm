@@ -47,4 +47,13 @@ suite =
                         Flags.decode (E.int 5)
                 in
                 Expect.equal ( Nothing, False ) ( f.lastVault, f.readerMode )
+        , test "missing fullParse defaults to True" <|
+            \_ ->
+                Expect.equal True (Flags.decode (E.object [ ( "readerMode", E.bool False ) ])).fullParse
+        , test "fullParse false decodes to False" <|
+            \_ ->
+                Expect.equal False (Flags.decode (E.object [ ( "fullParse", E.bool False ) ])).fullParse
+        , test "fullParse true decodes to True" <|
+            \_ ->
+                Expect.equal True (Flags.decode (E.object [ ( "fullParse", E.bool True ) ])).fullParse
         ]

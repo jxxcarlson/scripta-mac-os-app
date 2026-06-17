@@ -11,6 +11,7 @@ import Json.Decode as D
 type alias Flags =
     { lastVault : Maybe String
     , readerMode : Bool
+    , fullParse : Bool
     }
 
 
@@ -22,4 +23,7 @@ decode value =
     , readerMode =
         D.decodeValue (D.field "readerMode" D.bool) value
             |> Result.withDefault False
+    , fullParse =
+        D.decodeValue (D.field "fullParse" D.bool) value
+            |> Result.withDefault True
     }
