@@ -37,7 +37,12 @@ render source =
     { title = Html.text ""
     , body =
         [ Html.div
-            [ style "padding-left" "1em", style "padding-right" "1em" ]
+            [ style "padding-left" "1em"
+            , style "padding-right" "1em"
+
+            -- Match Scripta's body leading (Render/Block.elm uses line-height 1.5).
+            , style "line-height" "1.5"
+            ]
             body
         ]
     , toc = toc
