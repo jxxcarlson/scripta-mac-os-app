@@ -58,4 +58,12 @@ suite =
                     |> Query.index 0
                     |> Event.simulate Event.click
                     |> Event.expect (Render.ScrollTo "hello-world")
+        , test "nests sub-headings as an indented sub-list" <|
+            \_ ->
+                MarkdownRender.render "# Parent\n\n## Child"
+                    |> .toc
+                    |> Html.div []
+                    |> Query.fromHtml
+                    |> Query.findAll [ Selector.tag "ul" ]
+                    |> Query.count (Expect.equal 2)
         ]

@@ -104,9 +104,14 @@ markdownBlockToHtml block =
 `Render.ScrollTo slug` — routed through `GotRenderMsg` to the
 `scrollAndHighlight` port (same path as the Scripta reader TOC).
 -}
+ulStyle : String -> List (Html.Attribute msg)
+ulStyle paddingLeft =
+    [ style "list-style" "none", style "padding-left" paddingLeft, style "margin" "0" ]
+
+
 tocHtml : List ToCItem -> List (Html Render.RenderMsg)
 tocHtml items =
-    [ Html.ul [ style "list-style" "none", style "padding-left" "0", style "margin" "0" ]
+    [ Html.ul (ulStyle "0")
         (List.map tocItemView items)
     ]
 
@@ -116,7 +121,8 @@ tocItemView (Item _ str kids) =
     let
         link =
             Html.span
-                [ Html.Events.onClick (Render.ScrollTo (ToC.headingId str))
+                [ -- NOTE: link color is theme-unaware for now; revisit if render gains an isLight arg
+                  Html.Events.onClick (Render.ScrollTo (ToC.headingId str))
                 , style "cursor" "pointer"
                 , style "color" "#2563eb"
                 ]
@@ -128,6 +134,6 @@ tocItemView (Item _ str kids) =
     else
         Html.li []
             [ link
-            , Html.ul [ style "list-style" "none", style "padding-left" "1em", style "margin" "0" ]
+            , Html.ul (ulStyle "1em")
                 (List.map tocItemView kids)
             ]
