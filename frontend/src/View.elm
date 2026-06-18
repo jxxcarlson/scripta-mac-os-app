@@ -6,6 +6,7 @@ import Html.Attributes exposing (style)
 import Html.Events exposing (onClick, onInput)
 import Json.Decode as D
 import Language
+import MarkdownRender
 import PathUtil
 import Render
 import SaveState
@@ -109,6 +110,32 @@ view model =
 
                                 bodyHtml =
                                     (out.title :: out.body)
+                                        |> List.map (Html.map (\_ -> NoOpFromRender))
+
+                                tocCol =
+                                    if List.isEmpty out.toc then
+                                        []
+
+                                    else
+                                        [ div
+                                            [ style "width" "220px"
+                                            , style "flex" "0 0 auto"
+                                            , style "border-left" "1px solid #ddd"
+                                            , style "padding" "16px"
+                                            , style "overflow" "auto"
+                                            ]
+                                            (List.map (Html.map GotRenderMsg) out.toc)
+                                        ]
+                            in
+                            ( bodyHtml, tocCol )
+
+                        ( Just Language.Markdown, _ ) ->
+                            let
+                                out =
+                                    MarkdownRender.render model.content
+
+                                bodyHtml =
+                                    out.body
                                         |> List.map (Html.map (\_ -> NoOpFromRender))
 
                                 tocCol =
@@ -363,6 +390,11 @@ previewBody model =
                     Render.renderDocument model.isLight model.contentWidth doc
             in
             (out.title :: out.body)
+                |> List.map (Html.map (\_ -> NoOpFromRender))
+
+        ( Just Language.Markdown, _ ) ->
+            MarkdownRender.render model.content
+                |> .body
                 |> List.map (Html.map (\_ -> NoOpFromRender))
 
         ( Just lang, _ ) ->
