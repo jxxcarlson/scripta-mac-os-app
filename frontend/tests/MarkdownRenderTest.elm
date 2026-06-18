@@ -13,22 +13,30 @@ import Test.Html.Selector as Selector
 suite : Test
 suite =
     describe "MarkdownRender"
-        [ test "renders a level-1 heading as an h1 carrying a slug id" <|
+        [ test "renders a level-1 heading as an h2 (matching Scripta section sizing) carrying a slug id" <|
             \_ ->
                 MarkdownRender.render "# Hello World"
                     |> .body
                     |> Html.div []
                     |> Query.fromHtml
-                    |> Query.find [ Selector.tag "h1" ]
+                    |> Query.find [ Selector.tag "h2" ]
                     |> Query.has [ Selector.id "hello-world" ]
-        , test "renders a level-2 heading as an h2" <|
+        , test "renders a level-2 heading as an h3 (matching Scripta section sizing)" <|
             \_ ->
                 MarkdownRender.render "## Sub Section"
                     |> .body
                     |> Html.div []
                     |> Query.fromHtml
-                    |> Query.find [ Selector.tag "h2" ]
+                    |> Query.find [ Selector.tag "h3" ]
                     |> Query.has [ Selector.id "sub-section" ]
+        , test "renders headings with Scripta's non-bold section weight" <|
+            \_ ->
+                MarkdownRender.render "# Hello World"
+                    |> .body
+                    |> Html.div []
+                    |> Query.fromHtml
+                    |> Query.find [ Selector.tag "h2" ]
+                    |> Query.has [ Selector.style "font-weight" "normal" ]
         , test "renders a non-heading paragraph as a p element" <|
             \_ ->
                 MarkdownRender.render "just some text"

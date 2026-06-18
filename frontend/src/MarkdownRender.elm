@@ -72,27 +72,27 @@ markdownBlockToHtmlIndexed index block =
                     else
                         style "margin-top" "1em"
 
+                -- Match Scripta's section sizing/weight (Render/OrdinaryBlock.elm
+                -- renderSection): level 1 → h2, 2 → h3, 3 → h4, deeper → h5, with
+                -- the default (non-bold) section font-weight.
                 hElement =
                     case lvl of
                         1 ->
-                            Html.h1
-
-                        2 ->
                             Html.h2
 
-                        3 ->
+                        2 ->
                             Html.h3
 
-                        4 ->
+                        3 ->
                             Html.h4
 
-                        5 ->
-                            Html.h5
-
                         _ ->
-                            Html.h6
+                            Html.h5
             in
-            [ hElement [ idAttr, topMargin ] (List.map Inline.toHtml inlines) ]
+            [ hElement
+                [ idAttr, topMargin, style "font-weight" "normal" ]
+                (List.map Inline.toHtml inlines)
+            ]
 
         _ ->
             Block.defaultHtml (Just markdownBlockToHtml) Nothing block
