@@ -7,9 +7,10 @@ wiring in index.html). Headings carry slug ids so the TOC can scroll to them.
 
 import Html exposing (Html)
 import Html.Attributes exposing (id, style)
+import Html.Events
 import Markdown.Block as Block exposing (Block(..))
 import Markdown.Inline as Inline
-import Markdown.TableOfContents as ToC
+import Markdown.TableOfContents as ToC exposing (ToCItem(..))
 import Render
 
 
@@ -18,6 +19,16 @@ render source =
     let
         blocks =
             Block.parse Nothing source
+
+        tocItems =
+            ToC.fromBlocks blocks
+
+        toc =
+            if ToC.size tocItems > 1 then
+                tocHtml tocItems
+
+            else
+                []
 
         body =
             List.indexedMap markdownBlockToHtmlIndexed blocks
@@ -29,7 +40,7 @@ render source =
             [ style "padding-left" "1em", style "padding-right" "1em" ]
             body
         ]
-    , toc = []
+    , toc = toc
     }
 
 
@@ -87,3 +98,36 @@ markdownBlockToHtml block =
     -- Nested blocks are never the document's first element, so index 1
     -- (not 0) — they always get the normal top margin.
     markdownBlockToHtmlIndexed 1 block
+
+
+{-| Render the TOC tree. Each entry is a clickable `span` that emits
+`Render.ScrollTo slug` — routed through `GotRenderMsg` to the
+`scrollAndHighlight` port (same path as the Scripta reader TOC).
+-}
+tocHtml : List ToCItem -> List (Html Render.RenderMsg)
+tocHtml items =
+    [ Html.ul [ style "list-style" "none", style "padding-left" "0", style "margin" "0" ]
+        (List.map tocItemView items)
+    ]
+
+
+tocItemView : ToCItem -> Html Render.RenderMsg
+tocItemView (Item _ str kids) =
+    let
+        link =
+            Html.span
+                [ Html.Events.onClick (Render.ScrollTo (ToC.headingId str))
+                , style "cursor" "pointer"
+                , style "color" "#2563eb"
+                ]
+                [ Html.text str ]
+    in
+    if List.isEmpty kids then
+        Html.li [] [ link ]
+
+    else
+        Html.li []
+            [ link
+            , Html.ul [ style "list-style" "none", style "padding-left" "1em", style "margin" "0" ]
+                (List.map tocItemView kids)
+            ]

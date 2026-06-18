@@ -3,7 +3,9 @@ module MarkdownRenderTest exposing (suite)
 import Expect
 import Html
 import MarkdownRender
+import Render
 import Test exposing (Test, describe, test)
+import Test.Html.Event as Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
 
@@ -34,4 +36,26 @@ suite =
                     |> Html.div []
                     |> Query.fromHtml
                     |> Query.has [ Selector.tag "p" ]
+        , test "builds a TOC when there is more than one heading" <|
+            \_ ->
+                MarkdownRender.render "# One\n\n# Two"
+                    |> .toc
+                    |> List.isEmpty
+                    |> Expect.equal False
+        , test "omits the TOC when there is at most one heading" <|
+            \_ ->
+                MarkdownRender.render "# Only\n\nsome body text"
+                    |> .toc
+                    |> List.isEmpty
+                    |> Expect.equal True
+        , test "a TOC entry click produces ScrollTo with the heading slug" <|
+            \_ ->
+                MarkdownRender.render "# Hello World\n\n# Second"
+                    |> .toc
+                    |> Html.div []
+                    |> Query.fromHtml
+                    |> Query.findAll [ Selector.tag "span" ]
+                    |> Query.index 0
+                    |> Event.simulate Event.click
+                    |> Event.expect (Render.ScrollTo "hello-world")
         ]
