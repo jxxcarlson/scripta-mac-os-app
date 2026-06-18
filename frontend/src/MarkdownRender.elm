@@ -84,4 +84,6 @@ markdownBlockToHtmlIndexed index block =
 
 markdownBlockToHtml : Block b i -> List (Html msg)
 markdownBlockToHtml block =
+    -- Nested blocks are never the document's first element, so index 1
+    -- (not 0) — they always get the normal top margin.
     markdownBlockToHtmlIndexed 1 block
