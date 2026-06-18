@@ -66,4 +66,11 @@ suite =
                     |> Query.fromHtml
                     |> Query.findAll [ Selector.tag "ul" ]
                     |> Query.count (Expect.equal 2)
+        , test "emits a math-text element for inline math" <|
+            \_ ->
+                MarkdownRender.render "Pythagoras: $a^2 + b^2 = c^2$"
+                    |> .body
+                    |> Html.div []
+                    |> Query.fromHtml
+                    |> Query.has [ Selector.tag "math-text" ]
         ]
