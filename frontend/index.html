@@ -14,7 +14,7 @@
     <script src="vendor/codemirror-element.js"></script>
 
     <style>
-      html, body { margin: 0; height: 100%; }
+      html, body { margin: 0; height: 100%; background: var(--app-bg); color: var(--app-fg); }
       #app { height: 100vh; }
 
       /* CodeMirror theme palette. The vendored editor's theme references these
@@ -22,6 +22,20 @@
          Without these, selection / sync-highlight / search-match backgrounds are
          transparent — i.e. selection looks broken. Light-theme values: */
       :root {
+        --app-bg: #ffffff;
+        --app-fg: #1a1a1a;
+        --panel-bg: #ffffff;
+        --border: #dddddd;
+        --muted: #666666;
+        --link: #2563eb;
+        --banner-bg: #ffffdd;
+        --banner-border: #cccc00;
+        --error-bg: #ffeeee;
+        --error-fg: #990000;
+        --error-border: #cc9999;
+        --tree-selected-bg: #cfe6fb;
+        --tree-folder-bg: #e8f2fc;
+
         --cm-fg: #1a1a1a;
         --cm-bg: #ffffff;
         --cm-selection-bg: #b3d4fc;
@@ -52,6 +66,51 @@
         --cm-syntax-property-key: #005cc5;
       }
 
+      [data-theme="dark"] {
+        --app-bg: #1e1e1e;
+        --app-fg: #d4d4d4;
+        --panel-bg: #252526;
+        --border: #3a3a3a;
+        --muted: #999999;
+        --link: #6aa3ff;
+        --banner-bg: #4a4424;
+        --banner-border: #7a7030;
+        --error-bg: #4a2a2a;
+        --error-fg: #ffb3b3;
+        --error-border: #7a3a3a;
+        --tree-selected-bg: #2a4a6a;
+        --tree-folder-bg: #243c54;
+
+        --cm-fg: #d4d4d4;
+        --cm-bg: #1e1e1e;
+        --cm-selection-bg: #264f78;
+        --cm-selection-match-bg: #345f8c;
+        --cm-sync-highlight-bg: #4a4424;
+        --cm-search-match-bg: #6a5a2a;
+        --cm-search-match-border: #b8a04a;
+        --cm-search-active-bg: #a07a2a;
+        --cm-matching-bracket-bg: #2e5e3a;
+        --cm-panel-bg: #252526;
+        --cm-panel-fg: #d4d4d4;
+        --cm-panel-border: #3a3a3a;
+        --cm-gutter-bg: #1e1e1e;
+        --cm-gutter-fg: #6a6a6a;
+        --cm-active-line-gutter-bg: #2a2a2a;
+        --cm-fold-placeholder: #888888;
+        --cm-tooltip-bg: #252526;
+        --cm-syntax-arg: #9aa3ad;
+        --cm-syntax-block-name: #4ec9b0;
+        --cm-syntax-block-vert: #777777;
+        --cm-syntax-bracket: #c586c0;
+        --cm-syntax-code: #ce9178;
+        --cm-syntax-deep-orange: #d2691e;
+        --cm-syntax-element-name: #569cd6;
+        --cm-syntax-heading: #e06c75;
+        --cm-syntax-list-marker: #d7ba7d;
+        --cm-syntax-math: #c586c0;
+        --cm-syntax-property-key: #9cdcfe;
+      }
+
       button, .cm-button {
         background: #3b3f45;
         color: #fff;
@@ -75,6 +134,11 @@
         background-color: #cfe6fb;
         transition: background-color 0.2s ease;
         border-radius: 2px;
+      }
+
+      [data-theme="dark"] .lr-sync-highlight,
+      [data-theme="dark"] .toc-sync-highlight {
+        background-color: #2a4a6a;
       }
 
       /* CodeMirror search-panel buttons: CM's baseTheme sets color:inherit (dark
@@ -159,7 +223,8 @@
       const flags = {
         lastVault: lastVault,                        // string | null (from Rust)
         readerMode: lsGet('readerMode') === 'true',  // bool
-        fullParse: lsGet('fullParse') !== 'false'    // bool (unset → Full)
+        fullParse: lsGet('fullParse') !== 'false',   // bool (unset → Full)
+        isLight: lsGet('isLight') !== 'false'        // bool (unset → Light)
       };
       const app = Elm.Main.init({ node: document.getElementById('app'), flags: flags });
 
@@ -216,6 +281,9 @@
       });
       subscribePort('saveFullParse', (on) => {
         try { localStorage.setItem('fullParse', on ? 'true' : 'false'); } catch (e) {}
+      });
+      subscribePort('saveIsLight', (on) => {
+        try { localStorage.setItem('isLight', on ? 'true' : 'false'); } catch (e) {}
       });
       subscribePort('saveLastVault', (vault) => {
         invoke('set_last_vault', { vault: vault }).catch(() => {});
