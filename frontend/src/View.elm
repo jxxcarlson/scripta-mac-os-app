@@ -266,7 +266,7 @@ errorBanner model =
             []
 
 
-{-| A small folder glyph: filled black when closed, outline-only when open.
+{-| A small folder glyph: filled with the current text color when closed, outline-only when open.
 -}
 folderIcon : Bool -> Html msg
 folderIcon isOpen =
@@ -278,14 +278,14 @@ folderIcon isOpen =
         ]
         [ Svg.path
             [ SA.d "M1.5 4 H6 L7.5 5.5 H14.5 V13 H1.5 Z"
-            , SA.stroke "#000"
+            , SA.stroke "currentColor"
             , SA.strokeWidth "1"
             , SA.fill
                 (if isOpen then
                     "none"
 
                  else
-                    "#000"
+                    "currentColor"
                 )
             ]
             []
