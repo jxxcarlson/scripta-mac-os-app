@@ -10,6 +10,8 @@ type Language
     = Scripta
     | MiniLaTeX
     | Markdown
+    | PlainText
+    | Image
 
 
 {-| Determine the language from a file path by its extension (case-insensitive).
@@ -26,8 +28,23 @@ fromPath path =
         Just "md" ->
             Just Markdown
 
+        Just "jpg" ->
+            Just Image
+
+        Just "jpeg" ->
+            Just Image
+
+        Just "png" ->
+            Just Image
+
+        Just "gif" ->
+            Just Image
+
+        Just "webp" ->
+            Just Image
+
         _ ->
-            Nothing
+            Just PlainText
 
 
 lastSegment : List String -> Maybe String
@@ -53,3 +70,9 @@ label lang =
 
         Markdown ->
             "Markdown"
+
+        PlainText ->
+            "Plain text"
+
+        Image ->
+            "Image"

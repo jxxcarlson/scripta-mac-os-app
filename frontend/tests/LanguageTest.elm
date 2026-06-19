@@ -16,8 +16,16 @@ suite =
             \_ -> Expect.equal (Just Markdown) (Language.fromPath "a.md")
         , test "is case-insensitive" <|
             \_ -> Expect.equal (Just Scripta) (Language.fromPath "A.SCRIPTA")
-        , test "returns Nothing for unknown" <|
-            \_ -> Expect.equal Nothing (Language.fromPath "a.png")
+        , test "recognizes image extensions as Image" <|
+            \_ ->
+                Expect.equal [ Just Image, Just Image, Just Image, Just Image, Just Image ]
+                    (List.map Language.fromPath [ "a.png", "b.jpg", "c.jpeg", "d.gif", "e.webp" ])
+        , test "image extension is case-insensitive" <|
+            \_ -> Expect.equal (Just Image) (Language.fromPath "PHOTO.JPG")
+        , test "unknown extension is PlainText" <|
+            \_ -> Expect.equal (Just PlainText) (Language.fromPath "a.xyz")
+        , test "no extension is PlainText" <|
+            \_ -> Expect.equal (Just PlainText) (Language.fromPath "README")
         , test "v1 supports only Scripta" <|
             \_ ->
                 Expect.equal ( True, False, False )
