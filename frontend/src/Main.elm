@@ -51,6 +51,7 @@ init flagsValue =
         , loadedMtime = 0
         , externalConflict = False
         , parsedDoc = Nothing
+        , imageSrc = Nothing
         , language = Nothing
         , isLight = flags.isLight
         , contentWidth = 500
@@ -171,10 +172,17 @@ update msg model =
         ClickedTreeNode path ->
             case model.vaultRoot of
                 Just root ->
-                    request (PReadFile path)
-                        "read_file"
-                        [ ( "root", E.string root ), ( "path", E.string path ) ]
-                        { model | selectedPath = Just path, language = Language.fromPath path }
+                    if Language.fromPath path == Just Language.Image then
+                        request (PReadImage path)
+                            "read_image"
+                            [ ( "root", E.string root ), ( "path", E.string path ) ]
+                            { model | selectedPath = Just path, language = Just Language.Image }
+
+                    else
+                        request (PReadFile path)
+                            "read_file"
+                            [ ( "root", E.string root ), ( "path", E.string path ) ]
+                            { model | selectedPath = Just path, language = Language.fromPath path, imageSrc = Nothing }
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -500,7 +508,18 @@ handleResponse op resp model =
                                 , loadedMtime = mtime
                                 , externalConflict = False
                                 , parsedDoc = parsed
+                                , imageSrc = Nothing
                               }
+                            , Cmd.none
+                            )
+
+                        Err e ->
+                            ( { model | error = Just (D.errorToString e) }, Cmd.none )
+
+                PReadImage _ ->
+                    case D.decodeValue D.string result of
+                        Ok url ->
+                            ( { model | imageSrc = Just url, content = "", loadedContent = "", parsedDoc = Nothing }
                             , Cmd.none
                             )
 

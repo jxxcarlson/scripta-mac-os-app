@@ -22,6 +22,7 @@ type alias Model =
     , loadedMtime : Int
     , externalConflict : Bool
     , parsedDoc : Maybe Scripta.Document
+    , imageSrc : Maybe String
     , language : Maybe Language.Language
     , isLight : Bool
     , contentWidth : Int
@@ -50,6 +51,7 @@ type PendingOp
     | PExportPdf
     | PNoop
     | PLaunchFile
+    | PReadImage String
     | POpenExternal
 
 
