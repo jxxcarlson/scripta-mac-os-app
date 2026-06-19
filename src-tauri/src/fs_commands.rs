@@ -161,6 +161,34 @@ pub fn read_file(root: String, path: String) -> Result<FileContent, String> {
     read_file_impl(Path::new(&root), &path)
 }
 
+fn image_mime(p: &Path) -> &'static str {
+    match p
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        _ => "application/octet-stream",
+    }
+}
+
+pub fn read_image_impl(root: &Path, rel: &str) -> Result<String, String> {
+    use base64::Engine;
+    let abs = root.join(rel);
+    let bytes = std::fs::read(&abs).map_err(|e| e.to_string())?;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Ok(format!("data:{};base64,{}", image_mime(&abs), b64))
+}
+
+#[tauri::command]
+pub fn read_image(root: String, path: String) -> Result<String, String> {
+    read_image_impl(Path::new(&root), &path)
+}
+
 pub fn write_file_impl(root: &Path, rel: &str, content: &str) -> Result<u64, String> {
     let abs = root.join(rel);
     if let Some(parent) = abs.parent() {
@@ -896,6 +924,19 @@ mod tests {
         }
         assert!(!is_image_ext(Path::new("a.txt")));
         assert!(!is_image_ext(Path::new("a.pdf")));
+    }
+
+    #[test]
+    fn read_image_returns_png_data_url() {
+        use base64::Engine;
+        let dir = tempfile::tempdir().unwrap();
+        let bytes = [0x89u8, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]; // PNG signature
+        std::fs::write(dir.path().join("pic.png"), bytes).unwrap();
+        let url = read_image_impl(dir.path(), "pic.png").unwrap();
+        assert!(url.starts_with("data:image/png;base64,"));
+        let b64 = url.strip_prefix("data:image/png;base64,").unwrap();
+        let decoded = base64::engine::general_purpose::STANDARD.decode(b64).unwrap();
+        assert_eq!(decoded, bytes);
     }
 
     #[test]
