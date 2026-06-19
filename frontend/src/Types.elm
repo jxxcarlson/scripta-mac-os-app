@@ -85,3 +85,4 @@ type Msg
     | SetSearchQuery String
     | ToggledReaderMode
     | ToggledParseMode
+    | ToggledTheme

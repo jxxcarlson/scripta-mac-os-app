@@ -52,7 +52,7 @@ init flagsValue =
         , externalConflict = False
         , parsedDoc = Nothing
         , language = Nothing
-        , isLight = True
+        , isLight = flags.isLight
         , contentWidth = 500
         , saveState = SaveState.init
         , newName = ""
@@ -383,6 +383,13 @@ update msg model =
                     not model.readerMode
             in
             ( { model | readerMode = rm }, FileOps.saveReaderMode rm )
+
+        ToggledTheme ->
+            let
+                light =
+                    not model.isLight
+            in
+            ( { model | isLight = light }, FileOps.saveIsLight light )
 
         ToggledParseMode ->
             let
