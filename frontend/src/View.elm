@@ -1,4 +1,4 @@
-module View exposing (themeName, view)
+module View exposing (imagePane, plainTextPreview, themeName, view)
 
 import Editor
 import Html exposing (Html, button, div, li, span, text, ul)
@@ -197,7 +197,10 @@ view model =
                 )
 
         body =
-            if model.readerMode then
+            if model.language == Just Language.Image then
+                imageView model
+
+            else if model.readerMode then
                 readerView
 
             else
@@ -410,6 +413,38 @@ nodeView forceOpen highlights openFolders node =
                 )
 
 
+{-| Preview for a non-renderable text document: show its source verbatim. -}
+plainTextPreview : String -> Html msg
+plainTextPreview content =
+    Html.pre
+        [ style "white-space" "pre-wrap"
+        , style "font-family" "ui-monospace, monospace"
+        , style "margin" "0"
+        ]
+        [ Html.text content ]
+
+
+{-| The image element for an opened image document (empty src until loaded). -}
+imagePane : Maybe String -> Html msg
+imagePane imageSrc =
+    Html.img
+        [ Html.Attributes.src (Maybe.withDefault "" imageSrc)
+        , style "max-width" "100%"
+        , style "height" "auto"
+        ]
+        []
+
+
+{-| Full-width view for image documents: tree column + image pane. -}
+imageView : Model -> Html Msg
+imageView model =
+    div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
+        [ treeColumn model
+        , div [ style "flex" "1", style "padding" "16px", style "overflow" "auto" ]
+            [ imagePane model.imageSrc ]
+        ]
+
+
 previewBody : Model -> List (Html Msg)
 previewBody model =
     case ( model.language, model.parsedDoc ) of
@@ -426,8 +461,11 @@ previewBody model =
                 |> .body
                 |> List.map (Html.map GotRenderMsg)
 
+        ( Just Language.PlainText, _ ) ->
+            [ plainTextPreview model.content ]
+
         ( Just lang, _ ) ->
             [ Html.text (Language.label lang ++ " rendering is not yet supported.") ]
 
         ( Nothing, _ ) ->
-            [ Html.text "Open a .scripta file." ]
+            [ Html.text "Open a document." ]
