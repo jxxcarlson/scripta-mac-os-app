@@ -183,3 +183,5 @@ dev-dependencies too, but the normal dependency is what matters).
   bundling TeX.
 - Images referenced by relative path may not resolve from the temp dir (acceptable for v1).
 - No progress UI during compilation beyond it running off the UI thread.
+
+
