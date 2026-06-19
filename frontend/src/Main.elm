@@ -294,17 +294,33 @@ update msg model =
             case model.vaultRoot of
                 Just root ->
                     let
-                        path =
-                            PathUtil.siblingPath model.selectedPath (ensureScriptaExt model.newName)
+                        name =
+                            String.trim model.newName
                     in
-                    if String.isEmpty (String.trim model.newName) then
+                    if String.isEmpty name then
                         ( model, Cmd.none )
 
                     else
-                        request (PCreateFile path)
-                            "create_file"
-                            [ ( "root", E.string root ), ( "path", E.string path ), ( "content", E.string "" ) ]
-                            { model | newName = "" }
+                        case PathUtil.kbaseRoot root of
+                            Just kroot ->
+                                let
+                                    path =
+                                        "Inbox/" ++ name
+                                in
+                                request (PCreateFile path)
+                                    "create_file"
+                                    [ ( "root", E.string kroot ), ( "path", E.string path ), ( "content", E.string "" ) ]
+                                    { model | newName = "" }
+
+                            Nothing ->
+                                let
+                                    path =
+                                        PathUtil.siblingPath model.selectedPath name
+                                in
+                                request (PCreateFile path)
+                                    "create_file"
+                                    [ ( "root", E.string root ), ( "path", E.string path ), ( "content", E.string "" ) ]
+                                    { model | newName = "" }
 
                 Nothing ->
                     ( model, Cmd.none )
@@ -338,7 +354,7 @@ update msg model =
                                  else
                                     dir ++ "/"
                                 )
-                                    ++ ensureScriptaExt model.newName
+                                    ++ String.trim model.newName
                         in
                         request (PRename path newPath)
                             "rename"
@@ -592,12 +608,3 @@ relist model =
 
         Nothing ->
             ( model, Cmd.none )
-
-
-ensureScriptaExt : String -> String
-ensureScriptaExt name =
-    if String.endsWith ".scripta" name then
-        name
-
-    else
-        name ++ ".scripta"
