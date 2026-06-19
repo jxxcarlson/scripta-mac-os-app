@@ -56,4 +56,13 @@ suite =
         , test "fullParse true decodes to True" <|
             \_ ->
                 Expect.equal True (Flags.decode (E.object [ ( "fullParse", E.bool True ) ])).fullParse
+        , test "missing isLight defaults to True" <|
+            \_ ->
+                Expect.equal True (Flags.decode (E.object [ ( "readerMode", E.bool False ) ])).isLight
+        , test "isLight false decodes to False" <|
+            \_ ->
+                Expect.equal False (Flags.decode (E.object [ ( "isLight", E.bool False ) ])).isLight
+        , test "isLight true decodes to True" <|
+            \_ ->
+                Expect.equal True (Flags.decode (E.object [ ( "isLight", E.bool True ) ])).isLight
         ]

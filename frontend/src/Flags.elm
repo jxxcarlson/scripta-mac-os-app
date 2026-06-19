@@ -12,6 +12,7 @@ type alias Flags =
     { lastVault : Maybe String
     , readerMode : Bool
     , fullParse : Bool
+    , isLight : Bool
     }
 
 
@@ -25,5 +26,8 @@ decode value =
             |> Result.withDefault False
     , fullParse =
         D.decodeValue (D.field "fullParse" D.bool) value
+            |> Result.withDefault True
+    , isLight =
+        D.decodeValue (D.field "isLight" D.bool) value
             |> Result.withDefault True
     }
