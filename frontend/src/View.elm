@@ -1,4 +1,4 @@
-module View exposing (view)
+module View exposing (themeName, view)
 
 import Editor
 import Html exposing (Html, button, div, li, span, text, ul)
@@ -19,11 +19,11 @@ import Workspace exposing (Node(..))
 
 treeColumn : Model -> Html Msg
 treeColumn model =
-    div [ style "width" "calc(260px + 2mm)", style "border-right" "1px solid #ddd", style "padding" "8px", style "overflow" "auto" ]
+    div [ style "width" "calc(260px + 2mm)", style "border-right" "1px solid var(--border)", style "padding" "8px", style "overflow" "auto", style "background" "var(--panel-bg)" ]
         (button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
             :: [ searchBox model
                , fileTree model
-               , div [ style "font-size" "12px", style "color" "#666", style "margin-top" "6px" ]
+               , div [ style "font-size" "12px", style "color" "var(--muted)", style "margin-top" "6px" ]
                     [ text (saveLabel model.saveState.saveStatus) ]
                , div [ style "margin-top" "8px", style "margin-bottom" "2mm", style "display" "flex", style "align-items" "center", style "gap" "2mm" ]
                     [ Html.input
@@ -49,6 +49,18 @@ treeColumn model =
         )
 
 
+{-| The `data-theme` attribute value for the current theme. Drives the CSS
+custom-property palette in index.html (`:root` light vs `[data-theme="dark"]`).
+-}
+themeName : Bool -> String
+themeName isLight =
+    if isLight then
+        "light"
+
+    else
+        "dark"
+
+
 view : Model -> Html Msg
 view model =
     let
@@ -59,7 +71,7 @@ view model =
                     [ Html.Attributes.attribute "text" model.loadedContent
                     , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
                     , style "flex" "1"
-                    , style "border-right" "1px solid #ddd"
+                    , style "border-right" "1px solid var(--border)"
                     ]
                     []
                 , div
@@ -77,7 +89,7 @@ view model =
                 , style "align-items" "center"
                 , style "gap" "8px"
                 , style "padding" "6px 8px"
-                , style "border-bottom" "1px solid #ddd"
+                , style "border-bottom" "1px solid var(--border)"
                 ]
                 [ button [ onClick ToggledReaderMode ]
                     [ text
@@ -95,6 +107,15 @@ view model =
 
                          else
                             "Parse: Incremental"
+                        )
+                    ]
+                , button [ onClick ToggledTheme ]
+                    [ text
+                        (if model.isLight then
+                            "Dark"
+
+                         else
+                            "Light"
                         )
                     ]
                 ]
@@ -120,7 +141,7 @@ view model =
                                         [ div
                                             [ style "width" "220px"
                                             , style "flex" "0 0 auto"
-                                            , style "border-left" "1px solid #ddd"
+                                            , style "border-left" "1px solid var(--border)"
                                             , style "padding" "16px"
                                             , style "overflow" "auto"
                                             ]
@@ -146,7 +167,7 @@ view model =
                                         [ div
                                             [ style "width" "220px"
                                             , style "flex" "0 0 auto"
-                                            , style "border-left" "1px solid #ddd"
+                                            , style "border-left" "1px solid var(--border)"
                                             , style "padding" "16px"
                                             , style "overflow" "auto"
                                             ]
@@ -182,14 +203,22 @@ view model =
             else
                 threePaneRow
     in
-    div [ style "display" "flex", style "flex-direction" "column", style "height" "100vh", style "font-family" "system-ui" ]
+    div
+        [ Html.Attributes.attribute "data-theme" (themeName model.isLight)
+        , style "display" "flex"
+        , style "flex-direction" "column"
+        , style "height" "100vh"
+        , style "font-family" "system-ui"
+        , style "background" "var(--app-bg)"
+        , style "color" "var(--app-fg)"
+        ]
         (conflictBanner model ++ errorBanner model ++ [ toolbar, body ])
 
 
 conflictBanner : Model -> List (Html Msg)
 conflictBanner model =
     if model.externalConflict then
-        [ div [ style "background" "#ffd", style "padding" "8px", style "border-bottom" "1px solid #cc0" ]
+        [ div [ style "background" "var(--banner-bg)", style "padding" "8px", style "border-bottom" "1px solid var(--banner-border)" ]
             [ text "This file changed on disk. "
             , button [ onClick ClickedReloadExternal ] [ text "Reload" ]
             , button [ onClick ClickedKeepMine ] [ text "Keep mine" ]
@@ -218,10 +247,10 @@ errorBanner model =
     case model.error of
         Just e ->
             [ div
-                [ style "background" "#fee"
-                , style "color" "#900"
+                [ style "background" "var(--error-bg)"
+                , style "color" "var(--error-fg)"
                 , style "padding" "8px"
-                , style "border-bottom" "1px solid #c99"
+                , style "border-bottom" "1px solid var(--error-border)"
                 , style "font-family" "ui-monospace, monospace"
                 , style "font-size" "12px"
                 , style "white-space" "pre-wrap"
@@ -333,7 +362,7 @@ nodeView forceOpen highlights openFolders node =
                  , style "align-items" "flex-start"
                  ]
                     ++ (if Just r.path == highlights.selectedDoc then
-                            [ style "background-color" "#cfe6fb"
+                            [ style "background-color" "var(--tree-selected-bg)"
                             , style "border-radius" "3px"
                             , style "padding" "0 4px"
                             ]
@@ -360,7 +389,7 @@ nodeView forceOpen highlights openFolders node =
                      , style "align-items" "flex-start"
                      ]
                         ++ (if r.path == highlights.currentFolder then
-                                [ style "background-color" "#e8f2fc"
+                                [ style "background-color" "var(--tree-folder-bg)"
                                 , style "border-radius" "3px"
                                 , style "padding" "0 4px"
                                 ]

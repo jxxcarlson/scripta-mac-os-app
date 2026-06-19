@@ -126,10 +126,9 @@ tocItemView (Item _ str kids) =
     let
         link =
             Html.span
-                [ -- NOTE: link color is theme-unaware for now; revisit if render gains an isLight arg
-                  Html.Events.onClick (Render.ScrollTo (ToC.headingId str))
+                [ Html.Events.onClick (Render.ScrollTo (ToC.headingId str))
                 , style "cursor" "pointer"
-                , style "color" "#2563eb"
+                , style "color" "var(--link)"
                 ]
                 [ Html.text str ]
     in
