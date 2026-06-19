@@ -81,4 +81,38 @@ suite =
                     |> Html.div []
                     |> Query.fromHtml
                     |> Query.has [ Selector.tag "math-text" ]
+        , test "classifies a relative target as a local file" <|
+            \_ ->
+                Expect.equal MarkdownRender.LocalFile (MarkdownRender.classifyLink "III_The_Rose.pdf")
+        , test "classifies a subdir target as a local file" <|
+            \_ ->
+                Expect.equal MarkdownRender.LocalFile (MarkdownRender.classifyLink "sub/dir/file.pdf")
+        , test "classifies http(s) and mailto as web" <|
+            \_ ->
+                Expect.equal [ MarkdownRender.Web, MarkdownRender.Web, MarkdownRender.Web ]
+                    [ MarkdownRender.classifyLink "http://e.com"
+                    , MarkdownRender.classifyLink "https://e.com"
+                    , MarkdownRender.classifyLink "mailto:a@b.c"
+                    ]
+        , test "classifies a fragment as an anchor" <|
+            \_ ->
+                Expect.equal MarkdownRender.Anchor (MarkdownRender.classifyLink "#section")
+        , test "a local file link click emits OpenLocalFile" <|
+            \_ ->
+                MarkdownRender.render "[doc](III_The_Rose.pdf)"
+                    |> .body
+                    |> Html.div []
+                    |> Query.fromHtml
+                    |> Query.find [ Selector.tag "a" ]
+                    |> Event.simulate Event.click
+                    |> Event.expect (Render.OpenLocalFile "III_The_Rose.pdf")
+        , test "a web link click emits OpenUrl" <|
+            \_ ->
+                MarkdownRender.render "[site](https://example.com)"
+                    |> .body
+                    |> Html.div []
+                    |> Query.fromHtml
+                    |> Query.find [ Selector.tag "a" ]
+                    |> Event.simulate Event.click
+                    |> Event.expect (Render.OpenUrl "https://example.com")
         ]

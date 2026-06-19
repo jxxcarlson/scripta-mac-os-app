@@ -1,4 +1,4 @@
-module MarkdownRender exposing (render)
+module MarkdownRender exposing (LinkKind(..), classifyLink, render)
 
 {-| Render extended-Markdown source to the shared `Render.RenderOutput` shape.
 Math is emitted as `<math-text>` custom elements (handled by the existing KaTeX
@@ -8,8 +8,9 @@ wiring in index.html). Headings carry slug ids so the TOC can scroll to them.
 import Html exposing (Html)
 import Html.Attributes exposing (id, style)
 import Html.Events
+import Json.Decode as D
 import Markdown.Block as Block exposing (Block(..))
-import Markdown.Inline as Inline
+import Markdown.Inline as Inline exposing (Inline(..))
 import Markdown.TableOfContents as ToC exposing (ToCItem(..))
 import Render
 
@@ -49,12 +50,66 @@ render source =
     }
 
 
+type LinkKind
+    = Web
+    | Anchor
+    | LocalFile
+
+
+{-| Classify a markdown link href: web (browser), in-page anchor (native), or a
+relative local file (open with the default app, resolved against the doc dir).
+-}
+classifyLink : String -> LinkKind
+classifyLink url =
+    if
+        String.startsWith "http://" url
+            || String.startsWith "https://" url
+            || String.startsWith "mailto:" url
+    then
+        Web
+
+    else if String.startsWith "#" url then
+        Anchor
+
+    else
+        LocalFile
+
+
+{-| Render markdown inlines, intercepting Link inlines so file/web links open
+externally instead of navigating the webview. Recurses with itself so links
+nested inside emphasis are also intercepted.
+-}
+inlineRenderer : Inline i -> Html Render.RenderMsg
+inlineRenderer inline =
+    case inline of
+        Link url _ inlines ->
+            let
+                children =
+                    List.map inlineRenderer inlines
+            in
+            case classifyLink url of
+                Web ->
+                    Html.a [ Html.Attributes.href url, onClickPreventDefault (Render.OpenUrl url) ] children
+
+                LocalFile ->
+                    Html.a [ Html.Attributes.href url, onClickPreventDefault (Render.OpenLocalFile url) ] children
+
+                Anchor ->
+                    Html.a [ Html.Attributes.href url ] children
+
+        _ ->
+            Inline.defaultHtml (Just inlineRenderer) inline
+
+
+onClickPreventDefault : Render.RenderMsg -> Html.Attribute Render.RenderMsg
+onClickPreventDefault msg =
+    Html.Events.preventDefaultOn "click" (D.succeed ( msg, True ))
+
+
 {-| Render one markdown block. Headings get an `h1..h6` with a slug `id`
 (matching `ToC.headingId`); everything else defers to `Block.defaultHtml`.
-The output is statically typed `Html msg` (no event handlers), so it unifies
-with `Html Render.RenderMsg` at the call site.
 -}
-markdownBlockToHtmlIndexed : Int -> Block b i -> List (Html msg)
+markdownBlockToHtmlIndexed : Int -> Block b i -> List (Html Render.RenderMsg)
 markdownBlockToHtmlIndexed index block =
     case block of
         Heading _ lvl inlines ->
@@ -91,14 +146,14 @@ markdownBlockToHtmlIndexed index block =
             in
             [ hElement
                 [ idAttr, topMargin, style "font-weight" "normal" ]
-                (List.map Inline.toHtml inlines)
+                (List.map inlineRenderer inlines)
             ]
 
         _ ->
-            Block.defaultHtml (Just markdownBlockToHtml) Nothing block
+            Block.defaultHtml (Just markdownBlockToHtml) (Just inlineRenderer) block
 
 
-markdownBlockToHtml : Block b i -> List (Html msg)
+markdownBlockToHtml : Block b i -> List (Html Render.RenderMsg)
 markdownBlockToHtml block =
     -- Nested blocks are never the document's first element, so index 1
     -- (not 0) — they always get the normal top margin.

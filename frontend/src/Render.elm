@@ -15,6 +15,8 @@ type RenderMsg
     | NavigateToDocument String
     | HighlightId String
     | RenderNoOp
+    | OpenUrl String
+    | OpenLocalFile String
 
 
 type alias RenderOutput =
