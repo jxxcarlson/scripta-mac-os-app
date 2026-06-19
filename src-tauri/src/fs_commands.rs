@@ -28,7 +28,7 @@ pub fn watch_workspace(
     let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
         if let Ok(event) = res {
             for p in event.paths {
-                if !is_text_file(&p) && !is_image_ext(&p) {
+                if !is_text_ext(&p) && !is_image_ext(&p) {
                     continue;
                 }
                 if let Ok(rel) = p.strip_prefix(&root_for_cb) {
@@ -62,18 +62,21 @@ pub struct Entry {
     pub mtime: u64,
 }
 
-fn is_text_file(p: &Path) -> bool {
-    use std::io::Read;
-    let mut f = match std::fs::File::open(p) {
-        Ok(f) => f,
-        Err(_) => return false,
-    };
-    let mut buf = [0u8; 8192];
-    let n = match f.read(&mut buf) {
-        Ok(n) => n,
-        Err(_) => return false,
-    };
-    !buf[..n].contains(&0u8)
+/// Whether a path has a recognized text-document extension. Classification is
+/// by EXTENSION ONLY — we must never open a file during a directory walk, because
+/// the vault lives on iCloud Drive where reading a dataless file forces a
+/// synchronous on-demand download (reading every file would hang the app).
+fn is_text_ext(p: &Path) -> bool {
+    const TEXT_EXTS: &[&str] = &[
+        "scripta", "tex", "md", "markdown", "txt", "text", "csv", "tsv", "json",
+        "yaml", "yml", "toml", "ini", "cfg", "conf", "xml", "html", "htm", "css",
+        "js", "ts", "elm", "rs", "py", "sh", "bash", "rb", "go", "c", "h", "sql",
+        "log", "org", "rst",
+    ];
+    p.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| TEXT_EXTS.contains(&e.to_lowercase().as_str()))
+        .unwrap_or(false)
 }
 
 fn is_image_ext(p: &Path) -> bool {
@@ -107,7 +110,7 @@ pub fn list_workspace_impl(root: &Path) -> Result<Vec<Entry>, String> {
             continue;
         }
         let is_dir = dent.file_type().is_dir();
-        if !is_dir && !(is_text_file(p) || is_image_ext(p)) {
+        if !is_dir && !(is_text_ext(p) || is_image_ext(p)) {
             continue;
         }
         let rel = match p.strip_prefix(root).ok().and_then(|r| r.to_str()) {
@@ -614,7 +617,8 @@ mod tests {
         fs::create_dir(root.join("sub")).unwrap();
         fs::write(root.join("a.scripta"), "hello").unwrap();
         fs::write(root.join("sub/b.tex"), "x").unwrap();
-        // A real binary blob (NUL bytes) should be excluded even with a common extension.
+        // Classification is by extension only (never reads content), so a file with
+        // an image extension is listed regardless of its bytes.
         fs::write(root.join("corrupt.png"), [0u8, 1, 2, 3]).unwrap();
 
         let entries = list_workspace_impl(root).unwrap();
@@ -623,9 +627,7 @@ mod tests {
         assert!(paths.contains(&"a.scripta"));
         assert!(paths.contains(&"sub"));
         assert!(paths.contains(&"sub/b.tex"));
-        // corrupt.png has NUL bytes AND is_image_ext → still included (image by extension).
-        // To truly exclude, we'd need a non-image extension with binary content.
-        // Verify the binary file is listed (image by ext wins over binary sniff).
+        // corrupt.png is listed by its image extension (content is never inspected).
         assert!(paths.iter().any(|p| p.contains("corrupt.png")));
 
         let sub_entry = entries.iter().find(|e| e.path == "sub").unwrap();
@@ -903,17 +905,14 @@ mod tests {
     }
 
     #[test]
-    fn is_text_file_detects_text_and_binary() {
-        let dir = tempfile::tempdir().unwrap();
-        let t = dir.path().join("a.txt");
-        std::fs::write(&t, "hello world").unwrap();
-        assert!(is_text_file(&t));
-        let b = dir.path().join("a.bin");
-        std::fs::write(&b, [0u8, 1, 2, 3]).unwrap();
-        assert!(!is_text_file(&b));
-        let e = dir.path().join("empty.txt");
-        std::fs::write(&e, "").unwrap();
-        assert!(is_text_file(&e));
+    fn is_text_ext_recognizes_text_extensions() {
+        use std::path::Path;
+        for n in ["a.txt", "a.md", "a.scripta", "a.tex", "a.json", "a.csv", "A.MD"] {
+            assert!(is_text_ext(Path::new(n)), "{}", n);
+        }
+        for n in ["a.pdf", "a.png", "a.bin", "a.zip", "noext"] {
+            assert!(!is_text_ext(Path::new(n)), "{}", n);
+        }
     }
 
     #[test]
@@ -946,8 +945,13 @@ mod tests {
         std::fs::write(root.join("note.txt"), "hi").unwrap();
         std::fs::write(root.join("pic.png"), [1u8, 2, 3]).unwrap();
         std::fs::write(root.join("doc.scripta"), "x").unwrap();
+        // Excluded purely by extension — content is never read (iCloud-safe).
         std::fs::write(root.join("blob.bin"), [0u8, 1, 2]).unwrap();
-        std::fs::write(root.join("paper.pdf"), [0x25u8, 0x50, 0x00, 0x01]).unwrap(); // NUL → binary
+        std::fs::write(root.join("paper.pdf"), [0x25u8, 0x50, 0x44, 0x46]).unwrap();
+        // A text extension is listed regardless of content (no sniff)...
+        std::fs::write(root.join("weird.txt"), [0u8, 1, 2]).unwrap();
+        // ...and a non-listed extension is excluded even if its content is text.
+        std::fs::write(root.join("data.dat"), "plain text").unwrap();
         std::fs::write(root.join(".DS_Store"), "x").unwrap();
         std::fs::create_dir_all(root.join(".git")).unwrap();
         std::fs::write(root.join(".git/config"), "x").unwrap();
@@ -956,8 +960,10 @@ mod tests {
         assert!(names.contains(&"note.txt"));
         assert!(names.contains(&"pic.png"));
         assert!(names.contains(&"doc.scripta"));
+        assert!(names.contains(&"weird.txt"));
         assert!(!names.contains(&"blob.bin"));
         assert!(!names.contains(&"paper.pdf"));
+        assert!(!names.contains(&"data.dat"));
         assert!(!names.iter().any(|n| n.starts_with(".DS_Store")));
         assert!(!names.iter().any(|n| n.starts_with(".git")));
     }
