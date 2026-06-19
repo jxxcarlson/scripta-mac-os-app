@@ -28,7 +28,7 @@ pub fn watch_workspace(
     let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
         if let Ok(event) = res {
             for p in event.paths {
-                if !has_doc_ext(&p) {
+                if !is_text_file(&p) && !is_image_ext(&p) {
                     continue;
                 }
                 if let Ok(rel) = p.strip_prefix(&root_for_cb) {
@@ -62,27 +62,52 @@ pub struct Entry {
     pub mtime: u64,
 }
 
-const EXTS: [&str; 3] = ["scripta", "tex", "md"];
+fn is_text_file(p: &Path) -> bool {
+    use std::io::Read;
+    let mut f = match std::fs::File::open(p) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+    let mut buf = [0u8; 8192];
+    let n = match f.read(&mut buf) {
+        Ok(n) => n,
+        Err(_) => return false,
+    };
+    !buf[..n].contains(&0u8)
+}
 
-fn has_doc_ext(p: &Path) -> bool {
+fn is_image_ext(p: &Path) -> bool {
+    const IMG: [&str; 5] = ["jpg", "jpeg", "png", "gif", "webp"];
     p.extension()
         .and_then(|e| e.to_str())
-        .map(|e| EXTS.contains(&e.to_lowercase().as_str()))
+        .map(|e| IMG.contains(&e.to_lowercase().as_str()))
         .unwrap_or(false)
 }
 
-/// List every directory and every document file (extension scripta/tex/md)
+fn is_hidden(entry: &walkdir::DirEntry) -> bool {
+    entry
+        .file_name()
+        .to_str()
+        .map(|s| s.starts_with('.'))
+        .unwrap_or(false)
+}
+
+/// List every directory and every text or image file
 /// under `root`, returning entries with workspace-relative, '/'-separated paths.
-/// Entries are sorted by path. Non-UTF-8 paths are skipped.
+/// Entries are sorted by path. Non-UTF-8 paths and dotfiles/dot-directories are skipped.
 pub fn list_workspace_impl(root: &Path) -> Result<Vec<Entry>, String> {
     let mut out = Vec::new();
-    for dent in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
+    for dent in WalkDir::new(root)
+        .into_iter()
+        .filter_entry(|e| e.depth() == 0 || !is_hidden(e))
+        .filter_map(|e| e.ok())
+    {
         let p = dent.path();
         if p == root {
             continue;
         }
         let is_dir = dent.file_type().is_dir();
-        if !is_dir && !has_doc_ext(p) {
+        if !is_dir && !(is_text_file(p) || is_image_ext(p)) {
             continue;
         }
         let rel = match p.strip_prefix(root).ok().and_then(|r| r.to_str()) {
@@ -297,6 +322,13 @@ pub fn open_url(url: String) -> Result<(), String> {
 /// one that already exists OR has a recognized doc extension (scripta/tex/md).
 /// The program name (argv[0]) and flags (starting with '-') are ignored.
 pub fn launch_file_from_args(args: &[String]) -> Option<String> {
+    const DOC_EXTS: [&str; 3] = ["scripta", "tex", "md"];
+    fn has_doc_ext_local(p: &Path) -> bool {
+        p.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| DOC_EXTS.contains(&e.to_lowercase().as_str()))
+            .unwrap_or(false)
+    }
     args.iter()
         .skip(1)
         .find(|a| {
@@ -304,7 +336,7 @@ pub fn launch_file_from_args(args: &[String]) -> Option<String> {
                 return false;
             }
             let p = Path::new(a);
-            p.is_file() || has_doc_ext(p)
+            p.is_file() || has_doc_ext_local(p)
         })
         .cloned()
 }
@@ -548,13 +580,14 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn lists_only_doc_files_with_relative_paths() {
+    fn lists_text_image_and_dir_files_with_relative_paths() {
         let dir = tempdir().unwrap();
         let root = dir.path();
         fs::create_dir(root.join("sub")).unwrap();
         fs::write(root.join("a.scripta"), "hello").unwrap();
         fs::write(root.join("sub/b.tex"), "x").unwrap();
-        fs::write(root.join("ignore.png"), "x").unwrap();
+        // A real binary blob (NUL bytes) should be excluded even with a common extension.
+        fs::write(root.join("corrupt.png"), [0u8, 1, 2, 3]).unwrap();
 
         let entries = list_workspace_impl(root).unwrap();
         let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
@@ -562,7 +595,10 @@ mod tests {
         assert!(paths.contains(&"a.scripta"));
         assert!(paths.contains(&"sub"));
         assert!(paths.contains(&"sub/b.tex"));
-        assert!(!paths.iter().any(|p| p.contains("ignore.png")));
+        // corrupt.png has NUL bytes AND is_image_ext → still included (image by extension).
+        // To truly exclude, we'd need a non-image extension with binary content.
+        // Verify the binary file is listed (image by ext wins over binary sniff).
+        assert!(paths.iter().any(|p| p.contains("corrupt.png")));
 
         let sub_entry = entries.iter().find(|e| e.path == "sub").unwrap();
         assert!(sub_entry.is_dir);
@@ -836,5 +872,52 @@ mod tests {
         assert!(validate_external_url("mailto:a@b.c").is_ok());
         assert!(validate_external_url("file:///etc/passwd").is_err());
         assert!(validate_external_url("javascript:alert(1)").is_err());
+    }
+
+    #[test]
+    fn is_text_file_detects_text_and_binary() {
+        let dir = tempfile::tempdir().unwrap();
+        let t = dir.path().join("a.txt");
+        std::fs::write(&t, "hello world").unwrap();
+        assert!(is_text_file(&t));
+        let b = dir.path().join("a.bin");
+        std::fs::write(&b, [0u8, 1, 2, 3]).unwrap();
+        assert!(!is_text_file(&b));
+        let e = dir.path().join("empty.txt");
+        std::fs::write(&e, "").unwrap();
+        assert!(is_text_file(&e));
+    }
+
+    #[test]
+    fn is_image_ext_recognizes_images() {
+        use std::path::Path;
+        for n in ["a.png", "a.JPG", "a.jpeg", "a.gif", "a.webp"] {
+            assert!(is_image_ext(Path::new(n)), "{}", n);
+        }
+        assert!(!is_image_ext(Path::new("a.txt")));
+        assert!(!is_image_ext(Path::new("a.pdf")));
+    }
+
+    #[test]
+    fn list_includes_text_and_images_excludes_binary_and_dotfiles() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("note.txt"), "hi").unwrap();
+        std::fs::write(root.join("pic.png"), [1u8, 2, 3]).unwrap();
+        std::fs::write(root.join("doc.scripta"), "x").unwrap();
+        std::fs::write(root.join("blob.bin"), [0u8, 1, 2]).unwrap();
+        std::fs::write(root.join("paper.pdf"), [0x25u8, 0x50, 0x00, 0x01]).unwrap(); // NUL → binary
+        std::fs::write(root.join(".DS_Store"), "x").unwrap();
+        std::fs::create_dir_all(root.join(".git")).unwrap();
+        std::fs::write(root.join(".git/config"), "x").unwrap();
+        let entries = list_workspace_impl(root).unwrap();
+        let names: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
+        assert!(names.contains(&"note.txt"));
+        assert!(names.contains(&"pic.png"));
+        assert!(names.contains(&"doc.scripta"));
+        assert!(!names.contains(&"blob.bin"));
+        assert!(!names.contains(&"paper.pdf"));
+        assert!(!names.iter().any(|n| n.starts_with(".DS_Store")));
+        assert!(!names.iter().any(|n| n.starts_with(".git")));
     }
 }
