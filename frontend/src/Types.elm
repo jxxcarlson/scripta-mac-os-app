@@ -50,6 +50,7 @@ type PendingOp
     | PExportPdf
     | PNoop
     | PLaunchFile
+    | POpenExternal
 
 
 type Pane

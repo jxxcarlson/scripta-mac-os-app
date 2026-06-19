@@ -187,6 +187,23 @@ update msg model =
                 Render.ScrollTo id ->
                     ( model, FileOps.scrollAndHighlight id )
 
+                Render.OpenUrl url ->
+                    request POpenExternal "open_url" [ ( "url", E.string url ) ] model
+
+                Render.OpenLocalFile target ->
+                    case ( model.vaultRoot, model.selectedPath ) of
+                        ( Just root, Just doc ) ->
+                            request POpenExternal
+                                "open_path"
+                                [ ( "root", E.string root )
+                                , ( "doc", E.string doc )
+                                , ( "target", E.string target )
+                                ]
+                                model
+
+                        _ ->
+                            ( model, Cmd.none )
+
                 _ ->
                     ( model, Cmd.none )
 
@@ -511,6 +528,9 @@ handleResponse op resp model =
                     relist { model | selectedPath = Nothing, content = "", loadedContent = "", parsedDoc = Nothing }
 
                 PNoop ->
+                    ( model, Cmd.none )
+
+                POpenExternal ->
                     ( model, Cmd.none )
 
                 PExportSave ->

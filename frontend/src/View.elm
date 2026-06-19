@@ -157,7 +157,7 @@ view model =
 
                                 bodyHtml =
                                     out.body
-                                        |> List.map (Html.map (\_ -> NoOpFromRender))
+                                        |> List.map (Html.map GotRenderMsg)
 
                                 tocCol =
                                     if List.isEmpty out.toc then
@@ -424,7 +424,7 @@ previewBody model =
         ( Just Language.Markdown, _ ) ->
             MarkdownRender.render model.content
                 |> .body
-                |> List.map (Html.map (\_ -> NoOpFromRender))
+                |> List.map (Html.map GotRenderMsg)
 
         ( Just lang, _ ) ->
             [ Html.text (Language.label lang ++ " rendering is not yet supported.") ]
