@@ -26,4 +26,18 @@ suite =
             \_ -> Expect.equal "Physics/intro.scripta" (PathUtil.siblingPath (Just "Physics/notes.scripta") "intro.scripta")
         , test "siblingPath beside a deeply nested doc keeps the full folder" <|
             \_ -> Expect.equal "A/B/d.scripta" (PathUtil.siblingPath (Just "A/B/c.scripta") "d.scripta")
+        , test "kbaseRoot returns the vault path when it ends in kbase" <|
+            \_ ->
+                Expect.equal (Just "/Users/c/CloudDocs/kbase")
+                    (PathUtil.kbaseRoot "/Users/c/CloudDocs/kbase")
+        , test "kbaseRoot truncates a kbase descendant to the kbase root" <|
+            \_ ->
+                Expect.equal (Just "/Users/c/CloudDocs/kbase")
+                    (PathUtil.kbaseRoot "/Users/c/CloudDocs/kbase/Subjects/Physics")
+        , test "kbaseRoot is Nothing when there is no kbase segment" <|
+            \_ ->
+                Expect.equal Nothing (PathUtil.kbaseRoot "/Users/c/projects/notes")
+        , test "kbaseRoot requires an exact segment match (not a prefix)" <|
+            \_ ->
+                Expect.equal Nothing (PathUtil.kbaseRoot "/Users/c/kbase-backup/x")
         ]

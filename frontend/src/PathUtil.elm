@@ -1,4 +1,4 @@
-module PathUtil exposing (basename, parentDir, siblingPath)
+module PathUtil exposing (basename, kbaseRoot, parentDir, siblingPath)
 
 {-| Small '/'-separated path helpers shared by the file-open logic.
 -}
@@ -21,6 +21,30 @@ parentDir path =
 
         [] ->
             ""
+
+
+{-| If `path` contains a directory segment named "kbase", return the path
+truncated to and including that segment (the kbase root); otherwise Nothing.
+So `…/kbase` and `…/kbase/sub` both yield `Just "…/kbase"`. Matches whole
+segments only, so `kbase-backup` does not qualify. An absolute path's leading
+"" segment is preserved by the rejoin.
+-}
+kbaseRoot : String -> Maybe String
+kbaseRoot path =
+    let
+        go acc remaining =
+            case remaining of
+                [] ->
+                    Nothing
+
+                seg :: rest ->
+                    if seg == "kbase" then
+                        Just (String.join "/" (List.reverse (seg :: acc)))
+
+                    else
+                        go (seg :: acc) rest
+    in
+    go [] (String.split "/" path)
 
 
 {-| Path of a file named `fileName` placed in the same folder as `reference`
