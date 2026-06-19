@@ -31,6 +31,12 @@ treeColumn model =
                         , Html.Attributes.value model.newName
                         , onInput SetNewName
                         , style "width" "150px"
+
+                        -- Filenames are typed verbatim; stop macOS WKWebView from
+                        -- auto-capitalizing / auto-correcting them.
+                        , Html.Attributes.attribute "autocapitalize" "off"
+                        , Html.Attributes.attribute "autocorrect" "off"
+                        , Html.Attributes.spellcheck False
                         ]
                         []
                     , button [ onClick ClickedNewFile ] [ text "New" ]
