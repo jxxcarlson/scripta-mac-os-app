@@ -245,6 +245,54 @@ pub async fn export_save(
     }
 }
 
+/// Resolve a markdown link `target` relative to the directory of the document
+/// `doc_rel` (vault-relative), confined to `root`. Canonicalization requires the
+/// target to exist; a target escaping the vault is rejected.
+pub fn resolve_link_target(root: &Path, doc_rel: &str, target: &str) -> Result<PathBuf, String> {
+    let doc_abs = root.join(doc_rel);
+    let base = doc_abs
+        .parent()
+        .ok_or_else(|| "document has no parent directory".to_string())?;
+    let canon = base
+        .join(target)
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve link target: {}", e))?;
+    let root_canon = root.canonicalize().map_err(|e| e.to_string())?;
+    if !canon.starts_with(&root_canon) {
+        return Err("link target is outside the vault".to_string());
+    }
+    Ok(canon)
+}
+
+/// Only http/https/mailto URLs may be opened externally.
+pub fn validate_external_url(url: &str) -> Result<(), String> {
+    if url.starts_with("http://") || url.starts_with("https://") || url.starts_with("mailto:") {
+        Ok(())
+    } else {
+        Err(format!("refusing to open non-web URL: {}", url))
+    }
+}
+
+#[tauri::command]
+pub fn open_path(root: String, doc: String, target: String) -> Result<(), String> {
+    let abs = resolve_link_target(Path::new(&root), &doc, &target)?;
+    std::process::Command::new("open")
+        .arg(&abs)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    validate_external_url(&url)?;
+    std::process::Command::new("open")
+        .arg(&url)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// From a process's argv, return the first argument that is a document to open:
 /// one that already exists OR has a recognized doc extension (scripta/tex/md).
 /// The program name (argv[0]) and flags (starting with '-') are ignored.
@@ -741,5 +789,52 @@ mod tests {
         assert!(r.contains("Source line 17"));
         assert!(r.contains("Missing $ inserted."));
         assert!(r.contains("s^2"));
+    }
+
+    #[test]
+    fn resolve_link_sibling() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("doc.md"), "x").unwrap();
+        std::fs::write(root.join("file.pdf"), "x").unwrap();
+        let p = resolve_link_target(root, "doc.md", "file.pdf").unwrap();
+        assert_eq!(p, root.join("file.pdf").canonicalize().unwrap());
+    }
+
+    #[test]
+    fn resolve_link_in_subdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("a/b")).unwrap();
+        std::fs::write(root.join("a/b/_index.md"), "x").unwrap();
+        std::fs::write(root.join("a/b/pic.pdf"), "x").unwrap();
+        let p = resolve_link_target(root, "a/b/_index.md", "pic.pdf").unwrap();
+        assert_eq!(p, root.join("a/b/pic.pdf").canonicalize().unwrap());
+    }
+
+    #[test]
+    fn resolve_link_rejects_escape() {
+        let base = tempfile::tempdir().unwrap();
+        let root = base.path().join("vault");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("doc.md"), "x").unwrap();
+        std::fs::write(base.path().join("secret.pdf"), "x").unwrap();
+        assert!(resolve_link_target(&root, "doc.md", "../secret.pdf").is_err());
+    }
+
+    #[test]
+    fn resolve_link_missing_file_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("doc.md"), "x").unwrap();
+        assert!(resolve_link_target(dir.path(), "doc.md", "nope.pdf").is_err());
+    }
+
+    #[test]
+    fn external_url_scheme_validation() {
+        assert!(validate_external_url("https://example.com").is_ok());
+        assert!(validate_external_url("http://example.com").is_ok());
+        assert!(validate_external_url("mailto:a@b.c").is_ok());
+        assert!(validate_external_url("file:///etc/passwd").is_err());
+        assert!(validate_external_url("javascript:alert(1)").is_err());
     }
 }
