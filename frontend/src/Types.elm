@@ -14,6 +14,7 @@ type alias Model =
     { vaultRoot : Maybe String
     , tree : List Node
     , selectedPath : Maybe String
+    , history : List String
     , nextRequestId : Int
     , pending : Dict Int PendingOp
     , error : Maybe String
@@ -53,6 +54,7 @@ type PendingOp
     | PLaunchFile
     | PReadImage String
     | POpenExternal
+    | PResolveDocLink
 
 
 type Pane
@@ -89,3 +91,4 @@ type Msg
     | ToggledReaderMode
     | ToggledParseMode
     | ToggledTheme
+    | ClickedBack

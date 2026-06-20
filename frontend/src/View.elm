@@ -97,7 +97,12 @@ view model =
                 , style "padding" "6px 8px"
                 , style "border-bottom" "1px solid var(--border)"
                 ]
-                [ button [ onClick ToggledReaderMode ]
+                [ button
+                    [ onClick ClickedBack
+                    , Html.Attributes.disabled (List.isEmpty model.history)
+                    ]
+                    [ text "\u{2190} Back" ]
+                , button [ onClick ToggledReaderMode ]
                     [ text
                         (if model.readerMode then
                             "Exit Reader"

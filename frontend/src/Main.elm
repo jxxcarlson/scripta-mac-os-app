@@ -43,6 +43,7 @@ init flagsValue =
         { vaultRoot = Nothing
         , tree = []
         , selectedPath = Nothing
+        , history = []
         , nextRequestId = 0
         , pending = Dict.empty
         , error = Nothing
@@ -88,6 +89,7 @@ openVault root model =
             { model
                 | vaultRoot = Just root
                 , selectedPath = Nothing
+                , history = []
                 , content = ""
                 , loadedContent = ""
                 , parsedDoc = Nothing
@@ -125,6 +127,44 @@ openExternalFile abs model =
             request (PReadFile name) "read_file" [ ( "root", E.string parent ), ( "path", E.string name ) ] m2
     in
     ( m3, Cmd.batch [ c1, c3 ] )
+
+
+{-| Open a vault-relative document path in-app, pushing the current document
+onto the history stack (for Back).
+-}
+openDoc : String -> Model -> ( Model, Cmd Msg )
+openDoc path model =
+    let
+        history =
+            case model.selectedPath of
+                Just current ->
+                    current :: model.history
+
+                Nothing ->
+                    model.history
+    in
+    openDocNoPush path { model | history = history }
+
+
+{-| Open a vault-relative document path without touching history (used by Back). -}
+openDocNoPush : String -> Model -> ( Model, Cmd Msg )
+openDocNoPush path model =
+    case model.vaultRoot of
+        Just root ->
+            if Language.fromPath path == Just Language.Image then
+                request (PReadImage path)
+                    "read_image"
+                    [ ( "root", E.string root ), ( "path", E.string path ) ]
+                    { model | selectedPath = Just path, language = Just Language.Image }
+
+            else
+                request (PReadFile path)
+                    "read_file"
+                    [ ( "root", E.string root ), ( "path", E.string path ) ]
+                    { model | selectedPath = Just path, language = Language.fromPath path, imageSrc = Nothing }
+
+        Nothing ->
+            ( model, Cmd.none )
 
 
 saveOpenFoldersCmd : Maybe String -> Set.Set String -> Cmd Msg
@@ -170,22 +210,7 @@ update msg model =
             request PPickWorkspace "pick_workspace" [] model
 
         ClickedTreeNode path ->
-            case model.vaultRoot of
-                Just root ->
-                    if Language.fromPath path == Just Language.Image then
-                        request (PReadImage path)
-                            "read_image"
-                            [ ( "root", E.string root ), ( "path", E.string path ) ]
-                            { model | selectedPath = Just path, language = Just Language.Image }
-
-                    else
-                        request (PReadFile path)
-                            "read_file"
-                            [ ( "root", E.string root ), ( "path", E.string path ) ]
-                            { model | selectedPath = Just path, language = Language.fromPath path, imageSrc = Nothing }
-
-                Nothing ->
-                    ( model, Cmd.none )
+            openDoc path model
 
         NoOpFromRender ->
             ( model, Cmd.none )
@@ -203,6 +228,20 @@ update msg model =
                         ( Just root, Just doc ) ->
                             request POpenExternal
                                 "open_path"
+                                [ ( "root", E.string root )
+                                , ( "doc", E.string doc )
+                                , ( "target", E.string target )
+                                ]
+                                model
+
+                        _ ->
+                            ( model, Cmd.none )
+
+                Render.NavigateToFile target ->
+                    case ( model.vaultRoot, model.selectedPath ) of
+                        ( Just root, Just doc ) ->
+                            request PResolveDocLink
+                                "resolve_doc_link"
                                 [ ( "root", E.string root )
                                 , ( "doc", E.string doc )
                                 , ( "target", E.string target )
@@ -432,6 +471,14 @@ update msg model =
             in
             ( { model | isLight = light }, FileOps.saveIsLight light )
 
+        ClickedBack ->
+            case model.history of
+                prev :: rest ->
+                    openDocNoPush prev { model | history = rest }
+
+                [] ->
+                    ( model, Cmd.none )
+
         ToggledParseMode ->
             let
                 fp =
@@ -538,6 +585,14 @@ handleResponse op resp model =
                             ( { model | imageSrc = Just url, content = "", loadedContent = "", parsedDoc = Nothing }
                             , Cmd.none
                             )
+
+                        Err e ->
+                            ( { model | error = Just (D.errorToString e) }, Cmd.none )
+
+                PResolveDocLink ->
+                    case D.decodeValue D.string result of
+                        Ok path ->
+                            openDoc path model
 
                         Err e ->
                             ( { model | error = Just (D.errorToString e) }, Cmd.none )
