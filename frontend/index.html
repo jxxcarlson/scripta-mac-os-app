@@ -71,7 +71,7 @@
         --cm-syntax-property-key: #005cc5;
       }
 
-      :root { --terminal-height: 280px; }
+      :root { --terminal-height: 280px; --terminal-split: 50%; }
 
       [data-theme="dark"] {
         --app-bg: #1e1e1e;
@@ -313,6 +313,52 @@
         });
       })();
 
+      // --- Vertical separator between the AI pane (left) and shells/scratch (right). ---
+      (function () {
+        // Clamp left-pane width to [150, innerWidth-150] so the divider can never be
+        // dragged within 150px of either edge (and can't get stuck off-screen).
+        function applySplit(px, persist) {
+          var h = Math.max(150, Math.min(window.innerWidth - 150, px));
+          document.documentElement.style.setProperty('--terminal-split', h + 'px');
+          if (persist) { try { localStorage.setItem('terminalSplit', h); } catch (e) {} }
+          return h;
+        }
+        // Read current split from localStorage only (always px) — never parse the CSS
+        // var, which may still be the "50%" default.
+        var saved = parseInt(lsGet('terminalSplit'), 10);
+        if (!isNaN(saved)) applySplit(saved, true);
+        var dragging = false;
+        document.addEventListener('pointerdown', function (e) {
+          if (e.target && e.target.id === 'terminal-split-handle') { dragging = true; e.preventDefault(); }
+        });
+        document.addEventListener('pointermove', function (e) {
+          if (!dragging) return;
+          applySplit(e.clientX, false);
+        });
+        document.addEventListener('pointerup', function (e) {
+          if (!dragging) return;
+          dragging = false;
+          applySplit(e.clientX, true);
+        });
+        window.addEventListener('resize', function () {
+          var s = parseInt(lsGet('terminalSplit'), 10);
+          if (!isNaN(s)) applySplit(s, true);
+        });
+      })();
+
+      // --- Scratch buffer: debounce-save the scratch editor to localStorage. ---
+      (function () {
+        var saveTimer = null;
+        document.addEventListener('text-change', function (e) {
+          if (!(e.target && e.target.closest && e.target.closest('#scratch-editor'))) return;
+          var content = (e.detail && e.detail.source != null) ? e.detail.source : '';
+          clearTimeout(saveTimer);
+          saveTimer = setTimeout(function () {
+            try { localStorage.setItem('scratch', content); } catch (err) {}
+          }, 400);
+        });
+      })();
+
       let lastVault = null;
       try { lastVault = await invoke('get_last_vault'); } catch (e) { lastVault = null; }
       const flags = {
@@ -321,7 +367,8 @@
         fullParse: lsGet('fullParse') !== 'false',   // bool (unset → Full)
         isLight: lsGet('isLight') !== 'false',       // bool (unset → Light)
         aiConfig: JSON.parse(lsGet('aiConfig') || 'null'),   // object | null
-        terminalVisible: lsGet('terminalVisible') === 'true'   // bool (unset → hidden)
+        terminalVisible: lsGet('terminalVisible') === 'true',   // bool (unset → hidden)
+        scratchContent: lsGet('scratch') || ''                  // string (Scratch buffer)
       };
       const app = Elm.Main.init({ node: document.getElementById('app'), flags: flags });
 
@@ -448,6 +495,9 @@
       window.addEventListener('keydown', function (e) {
         if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
           e.preventDefault();
+          // Scratch has no rendered panel and auto-saves; don't run document sync from it.
+          var ae = document.activeElement;
+          if (ae && ae.closest && ae.closest('#scratch-editor')) return;
           lrSync();
         }
       }, true);
