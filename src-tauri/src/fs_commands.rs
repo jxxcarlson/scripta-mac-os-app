@@ -470,6 +470,61 @@ pub fn set_last_vault(app: tauri::AppHandle, vault: String) -> Result<(), String
     write_last_vault(&last_vault_file(&app)?, &vault).map_err(|e| e.to_string())
 }
 
+const AI_KEYCHAIN_SERVICE: &str = "MacScriptaViewer-AI";
+
+/// Store (or update) `key` for `account` under `service` in the login Keychain.
+pub fn set_api_key_impl(service: &str, account: &str, key: &str) -> Result<(), String> {
+    let out = std::process::Command::new("security")
+        .args(["add-generic-password", "-U", "-s", service, "-a", account, "-w", key])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
+}
+
+/// Read the key for `account`. Errors if not found.
+pub fn read_api_key_impl(service: &str, account: &str) -> Result<String, String> {
+    let out = std::process::Command::new("security")
+        .args(["find-generic-password", "-s", service, "-a", account, "-w"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).trim_end_matches('\n').to_string())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
+}
+
+/// Delete the key for `account`. Treats "not found" as success.
+pub fn delete_api_key_impl(service: &str, account: &str) -> Result<(), String> {
+    let out = std::process::Command::new("security")
+        .args(["delete-generic-password", "-s", service, "-a", account])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if out.status.success() {
+        return Ok(());
+    }
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    if stderr.contains("could not be found") {
+        Ok(())
+    } else {
+        Err(stderr.trim().to_string())
+    }
+}
+
+#[tauri::command]
+pub fn set_api_key(provider: String, key: String) -> Result<(), String> {
+    set_api_key_impl(AI_KEYCHAIN_SERVICE, &provider, &key)
+}
+
+#[tauri::command]
+pub fn delete_api_key(provider: String) -> Result<(), String> {
+    delete_api_key_impl(AI_KEYCHAIN_SERVICE, &provider)
+}
+
 /// A concise, human-readable error from a latexmk/pdflatex run for the UI banner:
 /// the first LaTeX error line ("! ...") through the source-location line
 /// ("l.<n> ...") and the line after it (which shows where on that line the engine
@@ -1026,6 +1081,19 @@ mod tests {
         for n in ["a.pdf", "a.png", "a.bin", "a.zip", "noext"] {
             assert!(!is_text_ext(Path::new(n)), "{}", n);
         }
+    }
+
+    #[test]
+    fn keychain_set_get_delete_round_trip() {
+        let service = "MacScriptaViewer-AI-test-rt";
+        let _ = delete_api_key_impl(service, "anthropic");
+        set_api_key_impl(service, "anthropic", "sk-test-1234").unwrap();
+        assert_eq!(read_api_key_impl(service, "anthropic").unwrap(), "sk-test-1234");
+        set_api_key_impl(service, "anthropic", "sk-test-5678").unwrap();
+        assert_eq!(read_api_key_impl(service, "anthropic").unwrap(), "sk-test-5678");
+        delete_api_key_impl(service, "anthropic").unwrap();
+        delete_api_key_impl(service, "anthropic").unwrap();
+        assert!(read_api_key_impl(service, "anthropic").is_err());
     }
 
     #[test]

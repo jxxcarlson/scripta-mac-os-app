@@ -33,6 +33,8 @@ pub fn run() {
             fs_commands::open_url,
             fs_commands::read_image,
             fs_commands::resolve_doc_link,
+            fs_commands::set_api_key,
+            fs_commands::delete_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
