@@ -1,6 +1,7 @@
 module View exposing (imagePane, plainTextPreview, themeName, view)
 
 import AiConfig
+import Chat
 import Dict
 import Editor
 import Html exposing (Html, button, div, li, span, text, ul)
@@ -558,7 +559,7 @@ terminalDock model =
         , terminalTabBar model
         , Html.Keyed.node "div"
             [ style "flex" "1", style "min-height" "0", style "position" "relative" ]
-            [ ( "ai", terminalTabContent (model.terminalTab == "ai") aiPlaceholder )
+            [ ( "ai", terminalTabContent (model.terminalTab == "ai") (aiChatView model) )
             , ( "shell1", terminalTabContent (model.terminalTab == "shell1") (terminalPane "shell1" model) )
             , ( "shell2", terminalTabContent (model.terminalTab == "shell2") (terminalPane "shell2" model) )
             ]
@@ -610,10 +611,102 @@ terminalTabContent active content =
         [ content ]
 
 
-aiPlaceholder : Html Msg
-aiPlaceholder =
-    div [ style "padding" "16px", style "color" "var(--muted)" ]
-        [ text "AI chat — coming in the next step." ]
+aiChatView : Model -> Html Msg
+aiChatView model =
+    let
+        provider =
+            AiConfig.activeProvider model.aiConfig
+
+        hasKey =
+            AiConfig.keyHint provider model.aiConfig /= Nothing
+    in
+    div [ style "display" "flex", style "flex-direction" "column", style "height" "100%", style "min-height" "0" ]
+        [ div [ style "flex" "1", style "overflow" "auto", style "padding" "12px" ]
+            (List.map chatMessageView model.chatMessages
+                ++ (if model.chatPending then
+                        [ div [ style "color" "var(--muted)", style "font-style" "italic", style "padding" "4px 0" ] [ text "thinking\u{2026}" ] ]
+
+                    else
+                        []
+                   )
+            )
+        , if hasKey then
+            chatInputRow model
+
+          else
+            div [ style "padding" "12px", style "color" "var(--muted)", style "border-top" "1px solid var(--border)" ]
+                [ text ("Set an API key for " ++ AiConfig.providerLabel provider ++ " in \u{2699} Settings to use chat.") ]
+        ]
+
+
+chatMessageView : Chat.ChatMessage -> Html Msg
+chatMessageView m =
+    let
+        isUser =
+            m.role == "user"
+
+        body =
+            if isUser then
+                [ Html.pre [ style "white-space" "pre-wrap", style "margin" "0", style "font-family" "inherit" ] [ text m.content ] ]
+
+            else
+                MarkdownRender.render m.content |> .body |> List.map (Html.map (\_ -> NoOpFromRender))
+    in
+    div
+        [ style "margin-bottom" "12px"
+        , style "padding" "8px 10px"
+        , style "border-radius" "6px"
+        , style "background"
+            (if isUser then
+                "var(--tree-selected-bg)"
+
+             else
+                "var(--panel-bg)"
+            )
+        ]
+        (div [ style "font-size" "11px", style "font-weight" "700", style "color" "var(--muted)", style "margin-bottom" "4px" ]
+            [ text
+                (if isUser then
+                    "You"
+
+                 else
+                    "Assistant"
+                )
+            ]
+            :: body
+        )
+
+
+chatInputRow : Model -> Html Msg
+chatInputRow model =
+    div [ style "display" "flex", style "gap" "8px", style "padding" "8px", style "border-top" "1px solid var(--border)" ]
+        [ Html.input
+            [ Html.Attributes.placeholder "Message the AI\u{2026}"
+            , Html.Attributes.value model.chatInput
+            , onInput ChatInput
+            , Html.Events.on "keydown" chatEnterDecoder
+            , style "flex" "1"
+            ]
+            []
+        , button
+            [ onClick SendChat
+            , Html.Attributes.disabled (model.chatPending || String.isEmpty (String.trim model.chatInput))
+            ]
+            [ text "Send" ]
+        ]
+
+
+chatEnterDecoder : D.Decoder Msg
+chatEnterDecoder =
+    D.field "key" D.string
+        |> D.andThen
+            (\k ->
+                if k == "Enter" then
+                    D.succeed SendChat
+
+                else
+                    D.fail "not Enter"
+            )
 
 
 terminalPane : String -> Model -> Html Msg
