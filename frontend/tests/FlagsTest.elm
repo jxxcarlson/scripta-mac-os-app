@@ -83,4 +83,14 @@ suite =
             \_ -> Expect.equal False (Flags.decode (E.object [])).terminalVisible
         , test "terminalVisible true decodes to True" <|
             \_ -> Expect.equal True (Flags.decode (E.object [ ( "terminalVisible", E.bool True ) ])).terminalVisible
+        , test "decodes scratchContent" <|
+            \_ ->
+                Flags.decode (E.object [ ( "scratchContent", E.string "hello" ) ])
+                    |> .scratchContent
+                    |> Expect.equal "hello"
+        , test "missing scratchContent defaults to empty string" <|
+            \_ ->
+                Flags.decode (E.object [])
+                    |> .scratchContent
+                    |> Expect.equal ""
         ]

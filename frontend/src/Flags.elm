@@ -16,6 +16,7 @@ type alias Flags =
     , isLight : Bool
     , aiConfig : AiConfig.AiConfig
     , terminalVisible : Bool
+    , scratchContent : String
     }
 
 
@@ -39,4 +40,7 @@ decode value =
     , terminalVisible =
         D.decodeValue (D.field "terminalVisible" D.bool) value
             |> Result.withDefault False
+    , scratchContent =
+        D.decodeValue (D.field "scratchContent" D.string) value
+            |> Result.withDefault ""
     }
