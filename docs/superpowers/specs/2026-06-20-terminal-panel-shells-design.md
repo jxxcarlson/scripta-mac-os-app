@@ -65,7 +65,9 @@ Three layers, deliberately decoupled (the terminal I/O bypasses Elm, exactly lik
     `term.onData(d => invoke('terminal_input', { id, data: d }))`; `listen('terminal-output', e => { if (e.payload.id === id) term.write(base64ToBytes(e.payload.data)); })` (store the unlisten fn);
     on `terminal-exit` for this id, `term.write('\r\n[process exited]\r\n')`.
   - A `ResizeObserver` on the element re-`fit()`s and `invoke('terminal_resize', …)` when its size
-    changes (panel resize / window resize / tab shown).
+    changes (panel resize / window resize / tab shown). **Skip the fit/resize when the element is
+    0×0** (i.e. while the dock is hidden via `display:none`) so a hidden pane isn't resized to zero;
+    refit when it becomes visible again.
   - `disconnectedCallback`: unlisten, `invoke('terminal_close', { id })`, dispose the `Terminal`.
 - Terminal theme follows the app: read the current `--app-bg`/`--app-fg` (or pass light/dark via an
   attribute) so it matches dark mode. (Acceptable to start with xterm's default dark theme and
@@ -73,21 +75,29 @@ Three layers, deliberately decoupled (the terminal I/O bypasses Elm, exactly lik
 
 ### C. Elm panel UI (`View`, `Types`, `Main`, `Flags`, `FileOps`, `index.html` flags)
 
-- **Model** gains `terminalVisible : Bool`, `terminalTab : String` (`"ai"`/`"shell1"`/`"shell2"`,
-  default `"ai"`), `terminalHeight : Int` (px, default e.g. 280, clamped to a sane min/max).
+- **Model** gains `terminalVisible : Bool`, `terminalEverOpened : Bool` (session-only, not
+  persisted), `terminalTab : String` (`"ai"`/`"shell1"`/`"shell2"`, default `"ai"`),
+  `terminalHeight : Int` (px, default e.g. 280, clamped to a sane min/max).
 - **Toolbar:** a `button [ onClick ToggledTerminal ] [ text "⌘ Terminal" ]` flips `terminalVisible`
-  and persists it (`saveTerminalVisible` port, mirroring `saveReaderMode`).
-- **Dock:** when `terminalVisible`, render below `body` a panel of height `terminalHeight` with:
+  and persists it (`saveTerminalVisible` port, mirroring `saveReaderMode`). The first time it
+  becomes visible this session it also sets `terminalEverOpened = True`.
+- **Dock (mounted persistently so shells survive hide/show):** render the dock whenever
+  `terminalEverOpened` is `True` — i.e. it is mounted lazily on first open and then stays in the
+  DOM for the rest of the session — and control visibility with
+  `style "display" (if terminalVisible then "flex" else "none")` (NOT by unmounting). Because the
+  dock and its `terminal-pane` elements stay connected when hidden, **the shells keep running while
+  the panel is hidden**, and you return to them on re-show. The dock contains:
   - a **drag handle** strip on its top edge (see resize below),
   - a **tab bar**: AI · Shell 1 · Shell 2 (clicking sets `terminalTab` via `SelectTerminalTab`),
-  - a **content area** that, *while the panel is visible*, mounts **both** shell panes
+  - a **content area** mounting **both** shell panes
     (`Html.node "terminal-pane" [ attribute "term-id" "shell1", attribute "cwd" (vaultRoot or "") ] []`
     and `…"shell2"…`) plus the AI placeholder, showing only the active tab (others
-    `style "display" "none"`). Keeping both shell panes mounted means **switching tabs preserves
-    each shell's session**. (Hiding the whole panel unmounts the panes → those shells close;
-    reopening spawns fresh shells. Persisting shells across panel hide is a later enhancement.)
-  - To keep `terminal-pane` elements stable across tab switches/renders, give each a Elm
-    `Html.Keyed`-style stable key or a fixed `id` so Elm's vdom doesn't recreate them on tab change.
+    `style "display" "none"`). Both shell panes stay mounted, so **switching tabs preserves each
+    shell's session** too.
+  - Use `Html.Keyed` (or fixed stable `id`s) for the dock and the `terminal-pane` nodes so Elm's
+    vdom never recreates them on tab change / re-render (which would kill the shell).
+  - Shells end only when the app quits (or a shell exits on its own). There is no per-tab close
+    control in this sub-project.
 - **Resize:** the drag handle has a JS pointer-drag (small handler in `index.html`) that adjusts the
   dock's height live and, on pointer-up, sends the final height to Elm via `saveTerminalHeight`
   (persisted) — Elm holds `terminalHeight` and renders the dock at that height. (Same split-of-labor
@@ -103,8 +113,9 @@ Open:     panel shown → terminal-pane connected → invoke terminal_open(id, c
                                                   → Rust spawns $SHELL in PTY (cwd = vault)
 Output:   PTY → reader thread → emit terminal-output {id, data=base64} → pane (id match) → term.write
 Input:    keystrokes → xterm onData → invoke terminal_input {id, data}  → PTY writer
-Resize:   ResizeObserver / panel drag → fit → invoke terminal_resize {id, cols, rows}
-Close:    panel hidden / pane removed → disconnected → invoke terminal_close {id} → kill child
+Resize:   ResizeObserver / panel drag → fit (skip if 0×0) → invoke terminal_resize {id, cols, rows}
+Hide/show: ToggledTerminal → CSS display toggles; panes stay connected → shells keep running
+Close:    app quit (or shell self-exits) → disconnected/Drop → terminal_close → kill child
 Tabs:     SelectTerminalTab → terminalTab := id (both shell panes stay mounted; CSS shows active)
 ```
 
@@ -131,12 +142,15 @@ Elm controls only visibility, active tab, and dock height; all terminal I/O is t
 - **Manual (GUI):** open the vault → click ⌘ Terminal → dock appears → Shell 1 runs `$SHELL` with
   `pwd` = the vault → run `ls`, an interactive command, Ctrl-C, arrow-key history → switch to
   Shell 2 (independent session) → switch back (Shell 1 state preserved) → drag the top edge to
-  resize → toggle off/on → relaunch (visibility + height persist) → AI tab shows the placeholder.
+  resize → **toggle the panel off then on → the same shell sessions are still there (history
+  intact)** → relaunch (visibility + height persist; shells start fresh) → AI tab shows the
+  placeholder.
 
 ## Out of Scope (later sub-projects / YAGNI)
 
 - AI chat in tab 1 (#3); the AI agent + vault access (#4).
-- Keeping shells alive while the panel is hidden; restoring scrollback across launches.
+- Restoring shells/scrollback across app launches (shells persist across hide/show within a
+  session, but a relaunch starts fresh).
 - Terminal splits, more than two shells, configurable shell/font, copy-paste menus beyond xterm
   defaults, search.
 - A real keyboard shortcut for toggling (toolbar button only for now).
