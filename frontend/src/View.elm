@@ -23,29 +23,6 @@ treeColumn model =
         (button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
             :: [ searchBox model
                , fileTree model
-               , div [ style "font-size" "12px", style "color" "var(--muted)", style "margin-top" "6px" ]
-                    [ text (saveLabel model.saveState.saveStatus) ]
-               , div [ style "margin-top" "8px", style "margin-bottom" "2mm", style "display" "flex", style "align-items" "center", style "gap" "2mm" ]
-                    [ Html.input
-                        [ Html.Attributes.placeholder "new-file-name"
-                        , Html.Attributes.value model.newName
-                        , onInput SetNewName
-                        , style "width" "150px"
-
-                        -- Filenames are typed verbatim; stop macOS WKWebView from
-                        -- auto-capitalizing / auto-correcting them.
-                        , Html.Attributes.attribute "autocapitalize" "off"
-                        , Html.Attributes.attribute "autocorrect" "off"
-                        , Html.Attributes.spellcheck False
-                        ]
-                        []
-                    , button [ onClick ClickedNewFile ] [ text "New" ]
-                    , button [ onClick ClickedRename ] [ text "Rename" ]
-                    ]
-               , div [ style "margin-top" "4px", style "display" "flex", style "gap" "2mm" ]
-                    [ button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
-                    , button [ onClick ClickedChangeVault ] [ text "Change Vault" ]
-                    ]
                , div [ style "margin-top" "4px", style "display" "flex", style "gap" "2mm" ]
                     [ button [ onClick ClickedExportHtml ] [ text "Export HTML" ]
                     , button [ onClick ClickedExportLatex ] [ text "Export LaTeX" ]
@@ -96,6 +73,7 @@ view model =
                 , style "gap" "8px"
                 , style "padding" "6px 8px"
                 , style "border-bottom" "1px solid var(--border)"
+                , style "flex-wrap" "wrap"
                 ]
                 [ button
                     [ onClick ClickedBack
@@ -129,6 +107,22 @@ view model =
                             "Light"
                         )
                     ]
+                , Html.input
+                    [ Html.Attributes.placeholder "new-file-name"
+                    , Html.Attributes.value model.newName
+                    , onInput SetNewName
+                    , style "width" "150px"
+                    , Html.Attributes.attribute "autocapitalize" "off"
+                    , Html.Attributes.attribute "autocorrect" "off"
+                    , Html.Attributes.spellcheck False
+                    ]
+                    []
+                , button [ onClick ClickedNewFile ] [ text "New" ]
+                , button [ onClick ClickedRename ] [ text "Rename" ]
+                , button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
+                , button [ onClick ClickedChangeVault ] [ text "Change Vault" ]
+                , div [ style "font-size" "12px", style "color" "var(--muted)" ]
+                    [ text (saveLabel model.saveState.saveStatus) ]
                 ]
 
         readerView =
