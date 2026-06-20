@@ -1,3 +1,4 @@
+mod ai;
 mod fs_commands;
 mod terminal;
 
@@ -37,6 +38,7 @@ pub fn run() {
             fs_commands::resolve_doc_link,
             fs_commands::set_api_key,
             fs_commands::delete_api_key,
+            ai::ai_chat,
             terminal::terminal_open,
             terminal::terminal_input,
             terminal::terminal_resize,

@@ -525,6 +525,11 @@ pub fn delete_api_key(provider: String) -> Result<(), String> {
     delete_api_key_impl(AI_KEYCHAIN_SERVICE, &provider)
 }
 
+/// Read the stored API key for `provider` from the AI Keychain service.
+pub fn read_provider_key(provider: &str) -> Result<String, String> {
+    read_api_key_impl(AI_KEYCHAIN_SERVICE, provider)
+}
+
 /// A concise, human-readable error from a latexmk/pdflatex run for the UI banner:
 /// the first LaTeX error line ("! ...") through the source-location line
 /// ("l.<n> ...") and the line after it (which shows where on that line the engine
