@@ -81,12 +81,30 @@ suite =
                     |> Html.div []
                     |> Query.fromHtml
                     |> Query.has [ Selector.tag "math-text" ]
-        , test "classifies a relative target as a local file" <|
+        , test "classifies a pdf target as external" <|
             \_ ->
-                Expect.equal MarkdownRender.LocalFile (MarkdownRender.classifyLink "III_The_Rose.pdf")
-        , test "classifies a subdir target as a local file" <|
+                Expect.equal MarkdownRender.External (MarkdownRender.classifyLink "III_The_Rose.pdf")
+        , test "classifies a subdir pdf target as external" <|
             \_ ->
-                Expect.equal MarkdownRender.LocalFile (MarkdownRender.classifyLink "sub/dir/file.pdf")
+                Expect.equal MarkdownRender.External (MarkdownRender.classifyLink "sub/dir/file.pdf")
+        , test "classifies .md / .scripta targets as navigate" <|
+            \_ ->
+                Expect.equal [ MarkdownRender.Navigate, MarkdownRender.Navigate ]
+                    [ MarkdownRender.classifyLink "black-hole-study-notes.md"
+                    , MarkdownRender.classifyLink "sub/foo.scripta"
+                    ]
+        , test "classifies a bare folder target as navigate" <|
+            \_ ->
+                Expect.equal MarkdownRender.Navigate (MarkdownRender.classifyLink "Bar")
+        , test "a doc link click emits NavigateToFile" <|
+            \_ ->
+                MarkdownRender.render "[notes](black-hole-study-notes.md)"
+                    |> .body
+                    |> Html.div []
+                    |> Query.fromHtml
+                    |> Query.find [ Selector.tag "a" ]
+                    |> Event.simulate Event.click
+                    |> Event.expect (Render.NavigateToFile "black-hole-study-notes.md")
         , test "classifies http(s) and mailto as web" <|
             \_ ->
                 Expect.equal [ MarkdownRender.Web, MarkdownRender.Web, MarkdownRender.Web ]

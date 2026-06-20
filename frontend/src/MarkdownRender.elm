@@ -53,11 +53,12 @@ render source =
 type LinkKind
     = Web
     | Anchor
-    | LocalFile
+    | Navigate
+    | External
 
 
-{-| Classify a markdown link href: web (browser), in-page anchor (native), or a
-relative local file (open with the default app, resolved against the doc dir).
+{-| Classify a markdown link href. Relative `.md`/`.scripta` targets and bare
+folders navigate in-app; other relative targets (pdf, images, …) open externally.
 -}
 classifyLink : String -> LinkKind
 classifyLink url =
@@ -71,8 +72,28 @@ classifyLink url =
     else if String.startsWith "#" url then
         Anchor
 
+    else if isDocTarget url then
+        Navigate
+
     else
-        LocalFile
+        External
+
+
+{-| A relative target is a navigable document if it ends in `.md`/`.scripta`,
+or has no file extension in its last path segment (treated as a folder).
+-}
+isDocTarget : String -> Bool
+isDocTarget url =
+    let
+        lower =
+            String.toLower url
+
+        lastSeg =
+            url |> String.split "/" |> List.reverse |> List.head |> Maybe.withDefault url
+    in
+    String.endsWith ".md" lower
+        || String.endsWith ".scripta" lower
+        || not (String.contains "." lastSeg)
 
 
 {-| Render markdown inlines, intercepting Link inlines so file/web links open
@@ -91,7 +112,10 @@ inlineRenderer inline =
                 Web ->
                     Html.a [ Html.Attributes.href url, onClickPreventDefault (Render.OpenUrl url) ] children
 
-                LocalFile ->
+                Navigate ->
+                    Html.a [ Html.Attributes.href url, onClickPreventDefault (Render.NavigateToFile url) ] children
+
+                External ->
                     Html.a [ Html.Attributes.href url, onClickPreventDefault (Render.OpenLocalFile url) ] children
 
                 Anchor ->

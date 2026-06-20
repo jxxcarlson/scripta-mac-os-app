@@ -17,6 +17,7 @@ type RenderMsg
     | RenderNoOp
     | OpenUrl String
     | OpenLocalFile String
+    | NavigateToFile String
 
 
 type alias RenderOutput =
