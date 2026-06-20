@@ -557,12 +557,41 @@ terminalDock model =
             , style "flex" "0 0 auto"
             ]
             []
-        , terminalTabBar model
-        , Html.Keyed.node "div"
-            [ style "flex" "1", style "min-height" "0", style "position" "relative" ]
-            [ ( "ai", terminalTabContent (model.terminalTab == "ai") (aiChatView model) )
-            , ( "shell1", terminalTabContent (model.terminalTab == "shell1") (terminalPane "shell1" model) )
-            , ( "shell2", terminalTabContent (model.terminalTab == "shell2") (terminalPane "shell2" model) )
+        , div
+            [ style "display" "flex"
+            , style "flex-direction" "row"
+            , style "flex" "1"
+            , style "min-height" "0"
+            ]
+            [ div
+                [ style "width" "var(--terminal-split, 50%)"
+                , style "flex" "0 0 auto"
+                , style "min-width" "0"
+                , style "overflow" "hidden"
+                ]
+                [ aiChatView model ]
+            , div
+                [ Html.Attributes.id "terminal-split-handle"
+                , style "flex" "0 0 6px"
+                , style "cursor" "col-resize"
+                , style "background" "var(--border)"
+                ]
+                []
+            , div
+                [ style "display" "flex"
+                , style "flex-direction" "column"
+                , style "flex" "1"
+                , style "min-width" "0"
+                , style "min-height" "0"
+                ]
+                [ terminalTabBar model
+                , Html.Keyed.node "div"
+                    [ style "flex" "1", style "min-height" "0", style "position" "relative" ]
+                    [ ( "shell1", terminalTabContent (model.terminalTab == "shell1") (terminalPane "shell1" model) )
+                    , ( "shell2", terminalTabContent (model.terminalTab == "shell2") (terminalPane "shell2" model) )
+                    , ( "scratch", terminalTabContent (model.terminalTab == "scratch") (scratchPane model) )
+                    ]
+                ]
             ]
         ]
 
@@ -581,9 +610,7 @@ terminalTabBar model =
         , style "flex" "0 0 auto"
         , style "border-bottom" "1px solid var(--border)"
         ]
-        (List.map (terminalTabButton model)
-            [ ( "ai", "AI" ), ( "shell1", "Shell 1" ), ( "shell2", "Shell 2" ) ]
-        )
+        (List.map (terminalTabButton model) rightTabs)
 
 
 terminalTabButton : Model -> ( String, String ) -> Html Msg
@@ -720,6 +747,18 @@ terminalPane termId model =
     Html.node "terminal-pane"
         [ Html.Attributes.attribute "term-id" termId
         , Html.Attributes.attribute "cwd" (Maybe.withDefault "" model.vaultRoot)
+        , style "display" "block"
+        , style "width" "100%"
+        , style "height" "100%"
+        ]
+        []
+
+
+scratchPane : Model -> Html Msg
+scratchPane model =
+    Html.node "codemirror-editor"
+        [ Html.Attributes.id "scratch-editor"
+        , Html.Attributes.attribute "text" model.scratchContent
         , style "display" "block"
         , style "width" "100%"
         , style "height" "100%"
