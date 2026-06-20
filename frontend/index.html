@@ -71,6 +71,8 @@
         --cm-syntax-property-key: #005cc5;
       }
 
+      :root { --terminal-height: 280px; }
+
       [data-theme="dark"] {
         --app-bg: #1e1e1e;
         --app-fg: #d4d4d4;
@@ -217,12 +219,82 @@
       }
       customElements.define('math-text', MathText);
 
+      function b64ToBytes(b64) {
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return bytes;
+      }
+
+      class TerminalPane extends HTMLElement {
+        connectedCallback() {
+          if (this._term) return;
+          const id = this.getAttribute('term-id');
+          const cwd = this.getAttribute('cwd') || '';
+          const term = new Terminal({ convertEol: false, fontFamily: 'ui-monospace, monospace', fontSize: 13 });
+          const fit = new FitAddon.FitAddon();
+          term.loadAddon(fit);
+          term.open(this);
+          this._term = term;
+          this._fit = fit;
+          this._id = id;
+          this._fitAndResize();
+          invoke('terminal_open', { id: id, cwd: cwd, cols: term.cols, rows: term.rows }).catch(function () {});
+          term.onData(function (d) { invoke('terminal_input', { id: id, data: d }).catch(function () {}); });
+          this._unlistenOut = listen('terminal-output', function (e) {
+            if (e.payload && e.payload.id === id) term.write(b64ToBytes(e.payload.data));
+          });
+          this._unlistenExit = listen('terminal-exit', function (e) {
+            if (e.payload && e.payload.id === id) term.write('\r\n[process exited]\r\n');
+          });
+          const self = this;
+          this._ro = new ResizeObserver(function () { self._fitAndResize(); });
+          this._ro.observe(this);
+        }
+        _fitAndResize() {
+          if (this.offsetWidth === 0 || this.offsetHeight === 0) return;
+          try { this._fit.fit(); } catch (e) { return; }
+          if (this._term.cols > 0 && this._term.rows > 0) {
+            invoke('terminal_resize', { id: this._id, cols: this._term.cols, rows: this._term.rows }).catch(function () {});
+          }
+        }
+        disconnectedCallback() {
+          if (this._ro) this._ro.disconnect();
+          if (this._unlistenOut) this._unlistenOut.then(function (f) { f(); });
+          if (this._unlistenExit) this._unlistenExit.then(function (f) { f(); });
+          if (this._id) invoke('terminal_close', { id: this._id }).catch(function () {});
+          if (this._term) this._term.dispose();
+        }
+      }
+      customElements.define('terminal-pane', TerminalPane);
+
       // --- Tauri global API (withGlobalTauri) ---
       const { invoke } = window.__TAURI__.core;
       const { listen } = window.__TAURI__.event;
 
       // --- Boot Elm ---
       function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+      (function () {
+        const saved = lsGet('terminalHeight');
+        if (saved) document.documentElement.style.setProperty('--terminal-height', saved + 'px');
+        let dragging = false;
+        document.addEventListener('pointerdown', function (e) {
+          if (e.target && e.target.id === 'terminal-resize-handle') { dragging = true; e.preventDefault(); }
+        });
+        document.addEventListener('pointermove', function (e) {
+          if (!dragging) return;
+          const h = Math.max(120, Math.min(window.innerHeight - 120, window.innerHeight - e.clientY));
+          document.documentElement.style.setProperty('--terminal-height', h + 'px');
+        });
+        document.addEventListener('pointerup', function () {
+          if (!dragging) return;
+          dragging = false;
+          const cur = getComputedStyle(document.documentElement).getPropertyValue('--terminal-height').trim();
+          try { localStorage.setItem('terminalHeight', parseInt(cur, 10)); } catch (e) {}
+        });
+      })();
+
       let lastVault = null;
       try { lastVault = await invoke('get_last_vault'); } catch (e) { lastVault = null; }
       const flags = {
