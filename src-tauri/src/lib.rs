@@ -1,4 +1,5 @@
 mod fs_commands;
+mod terminal;
 
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
@@ -14,6 +15,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(fs_commands::WatcherState::default())
         .manage(fs_commands::LaunchFile(std::sync::Mutex::new(launch)))
+        .manage(terminal::TerminalState::default())
         .invoke_handler(tauri::generate_handler![
             fs_commands::list_workspace,
             fs_commands::pick_workspace,
@@ -35,6 +37,10 @@ pub fn run() {
             fs_commands::resolve_doc_link,
             fs_commands::set_api_key,
             fs_commands::delete_api_key,
+            terminal::terminal_open,
+            terminal::terminal_input,
+            terminal::terminal_resize,
+            terminal::terminal_close,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
