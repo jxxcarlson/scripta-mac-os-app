@@ -544,6 +544,7 @@ terminalDock model =
             )
         , style "flex-direction" "column"
         , style "height" "var(--terminal-height)"
+        , style "max-height" "calc(100vh - 120px)"
         , style "border-top" "1px solid var(--border)"
         , style "background" "var(--app-bg)"
         , style "min-height" "0"

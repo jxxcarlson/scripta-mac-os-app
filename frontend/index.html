@@ -276,22 +276,40 @@
       function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 
       (function () {
-        const saved = lsGet('terminalHeight');
-        if (saved) document.documentElement.style.setProperty('--terminal-height', saved + 'px');
+        // Clamp to [120, innerHeight-120] so the panel can never grow taller than
+        // the viewport (which would bury the resize handle and make it un-shrinkable).
+        function clampTerminalHeight(px) {
+          const max = Math.max(120, window.innerHeight - 120);
+          return Math.max(120, Math.min(max, px));
+        }
+        function applyTerminalHeight(px, persist) {
+          const h = clampTerminalHeight(px);
+          document.documentElement.style.setProperty('--terminal-height', h + 'px');
+          if (persist) { try { localStorage.setItem('terminalHeight', h); } catch (e) {} }
+          return h;
+        }
+        // On load, clamp + re-persist: repairs any oversized value saved when the
+        // window was taller (bigger display / later shrunk), so a restart recovers.
+        const saved = parseInt(lsGet('terminalHeight'), 10);
+        if (!isNaN(saved)) applyTerminalHeight(saved, true);
         let dragging = false;
         document.addEventListener('pointerdown', function (e) {
           if (e.target && e.target.id === 'terminal-resize-handle') { dragging = true; e.preventDefault(); }
         });
         document.addEventListener('pointermove', function (e) {
           if (!dragging) return;
-          const h = Math.max(120, Math.min(window.innerHeight - 120, window.innerHeight - e.clientY));
-          document.documentElement.style.setProperty('--terminal-height', h + 'px');
+          applyTerminalHeight(window.innerHeight - e.clientY, false);
         });
         document.addEventListener('pointerup', function () {
           if (!dragging) return;
           dragging = false;
-          const cur = getComputedStyle(document.documentElement).getPropertyValue('--terminal-height').trim();
-          try { localStorage.setItem('terminalHeight', parseInt(cur, 10)); } catch (e) {}
+          const cur = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--terminal-height'), 10);
+          if (!isNaN(cur)) applyTerminalHeight(cur, true);
+        });
+        // Re-clamp when the OS window is resized smaller, so the panel follows.
+        window.addEventListener('resize', function () {
+          const cur = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--terminal-height'), 10);
+          if (!isNaN(cur)) applyTerminalHeight(cur, true);
         });
       })();
 
