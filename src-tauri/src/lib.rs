@@ -32,6 +32,7 @@ pub fn run() {
             fs_commands::open_path,
             fs_commands::open_url,
             fs_commands::read_image,
+            fs_commands::resolve_doc_link,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

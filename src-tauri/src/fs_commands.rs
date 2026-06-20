@@ -301,6 +301,54 @@ pub async fn export_save(
     }
 }
 
+/// Clean a Markdown link target: trim, strip surrounding `<…>`, and percent-decode.
+pub fn clean_target(target: &str) -> String {
+    let t = target.trim();
+    let t = if t.len() >= 2 && t.starts_with('<') && t.ends_with('>') {
+        &t[1..t.len() - 1]
+    } else {
+        t
+    };
+    percent_encoding::percent_decode_str(t)
+        .decode_utf8_lossy()
+        .into_owned()
+}
+
+/// Resolve a relative link `target` (from document `doc_rel`) to the vault-relative
+/// path of the document to open. Folders resolve to their `_index.md`. Confined to
+/// `root`. Errors if missing / not a file / escaping the vault.
+pub fn resolve_doc_link_impl(root: &Path, doc_rel: &str, target: &str) -> Result<String, String> {
+    let t = clean_target(target);
+    let doc_abs = root.join(doc_rel);
+    let base = doc_abs
+        .parent()
+        .ok_or_else(|| "document has no parent directory".to_string())?;
+    let mut canon = base
+        .join(&t)
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve link target: {}", e))?;
+    if canon.is_dir() {
+        canon = canon
+            .join("_index.md")
+            .canonicalize()
+            .map_err(|e| format!("folder has no _index.md: {}", e))?;
+    }
+    let root_canon = root.canonicalize().map_err(|e| e.to_string())?;
+    if !canon.starts_with(&root_canon) {
+        return Err("link target is outside the vault".to_string());
+    }
+    if !canon.is_file() {
+        return Err("link target is not a file".to_string());
+    }
+    let rel = canon.strip_prefix(&root_canon).map_err(|e| e.to_string())?;
+    Ok(rel.to_string_lossy().replace('\\', "/"))
+}
+
+#[tauri::command]
+pub fn resolve_doc_link(root: String, doc: String, target: String) -> Result<String, String> {
+    resolve_doc_link_impl(Path::new(&root), &doc, &target)
+}
+
 /// Resolve a markdown link `target` relative to the directory of the document
 /// `doc_rel` (vault-relative), confined to `root`. Canonicalization requires the
 /// target to exist; a target escaping the vault is rejected.
@@ -310,7 +358,7 @@ pub fn resolve_link_target(root: &Path, doc_rel: &str, target: &str) -> Result<P
         .parent()
         .ok_or_else(|| "document has no parent directory".to_string())?;
     let canon = base
-        .join(target)
+        .join(clean_target(target))
         .canonicalize()
         .map_err(|e| format!("cannot resolve link target: {}", e))?;
     let root_canon = root.canonicalize().map_err(|e| e.to_string())?;
@@ -855,6 +903,71 @@ mod tests {
         assert!(r.contains("Source line 17"));
         assert!(r.contains("Missing $ inserted."));
         assert!(r.contains("s^2"));
+    }
+
+    #[test]
+    fn clean_target_strips_and_decodes() {
+        assert_eq!(clean_target("<a b.pdf>"), "a b.pdf");
+        assert_eq!(clean_target("a%20b.pdf"), "a b.pdf");
+        assert_eq!(clean_target("  plain.md  "), "plain.md");
+        assert_eq!(clean_target("Bar/_index.md"), "Bar/_index.md");
+    }
+
+    #[test]
+    fn resolve_doc_link_sibling_and_subdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("A")).unwrap();
+        std::fs::write(root.join("A/doc.md"), "x").unwrap();
+        std::fs::write(root.join("A/other.md"), "y").unwrap();
+        assert_eq!(resolve_doc_link_impl(root, "A/doc.md", "other.md").unwrap(), "A/other.md");
+        std::fs::create_dir_all(root.join("A/B")).unwrap();
+        std::fs::write(root.join("A/B/deep.scripta"), "z").unwrap();
+        assert_eq!(resolve_doc_link_impl(root, "A/doc.md", "B/deep.scripta").unwrap(), "A/B/deep.scripta");
+    }
+
+    #[test]
+    fn resolve_doc_link_folder_to_index() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("doc.md"), "x").unwrap();
+        std::fs::create_dir_all(root.join("Bar")).unwrap();
+        std::fs::write(root.join("Bar/_index.md"), "i").unwrap();
+        assert_eq!(resolve_doc_link_impl(root, "doc.md", "Bar").unwrap(), "Bar/_index.md");
+        assert_eq!(resolve_doc_link_impl(root, "doc.md", "Bar/_index.md").unwrap(), "Bar/_index.md");
+    }
+
+    #[test]
+    fn resolve_doc_link_decodes_and_strips() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("doc.md"), "x").unwrap();
+        std::fs::write(root.join("a b.md"), "y").unwrap();
+        assert_eq!(resolve_doc_link_impl(root, "doc.md", "a%20b.md").unwrap(), "a b.md");
+        assert_eq!(resolve_doc_link_impl(root, "doc.md", "<a b.md>").unwrap(), "a b.md");
+    }
+
+    #[test]
+    fn resolve_doc_link_rejects_escape_and_missing() {
+        let base = tempfile::tempdir().unwrap();
+        let root = base.path().join("vault");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("doc.md"), "x").unwrap();
+        std::fs::write(base.path().join("outside.md"), "o").unwrap();
+        assert!(resolve_doc_link_impl(&root, "doc.md", "../outside.md").is_err());
+        assert!(resolve_doc_link_impl(&root, "doc.md", "nope.md").is_err());
+    }
+
+    #[test]
+    fn resolve_link_target_cleans_target() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("doc.md"), "x").unwrap();
+        std::fs::write(root.join("a b.pdf"), "p").unwrap();
+        let p = resolve_link_target(root, "doc.md", "<a b.pdf>").unwrap();
+        assert_eq!(p, root.join("a b.pdf").canonicalize().unwrap());
+        let p2 = resolve_link_target(root, "doc.md", "a%20b.pdf").unwrap();
+        assert_eq!(p2, root.join("a b.pdf").canonicalize().unwrap());
     }
 
     #[test]
