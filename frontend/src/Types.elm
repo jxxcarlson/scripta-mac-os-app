@@ -42,6 +42,7 @@ type alias Model =
     , terminalVisible : Bool
     , terminalEverOpened : Bool
     , terminalTab : String
+    , scratchContent : String
     , chatMessages : List Chat.ChatMessage
     , chatInput : String
     , chatPending : Bool
