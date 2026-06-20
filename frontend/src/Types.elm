@@ -59,6 +59,8 @@ type PendingOp
     | PReadImage String
     | POpenExternal
     | PResolveDocLink
+    | PSetApiKey String String
+    | PDeleteApiKey String
 
 
 type Pane
@@ -96,3 +98,9 @@ type Msg
     | ToggledParseMode
     | ToggledTheme
     | ClickedBack
+    | ToggledSettings
+    | SetActiveProvider String
+    | SetProviderModel String String
+    | AiKeyInput String String
+    | SubmitApiKey String
+    | DeleteApiKey String

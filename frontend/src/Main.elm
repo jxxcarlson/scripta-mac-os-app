@@ -1,5 +1,6 @@
 module Main exposing (main)
 
+import AiConfig
 import Browser
 import Dict
 import Export
@@ -474,6 +475,46 @@ update msg model =
             in
             ( { model | isLight = light }, FileOps.saveIsLight light )
 
+        ToggledSettings ->
+            ( { model | showSettings = not model.showSettings }, Cmd.none )
+
+        SetActiveProvider provider ->
+            let
+                cfg =
+                    AiConfig.setActiveProvider provider model.aiConfig
+            in
+            ( { model | aiConfig = cfg }, FileOps.saveAiConfig (AiConfig.encode cfg) )
+
+        SetProviderModel provider modelName ->
+            let
+                cfg =
+                    AiConfig.setModel provider modelName model.aiConfig
+            in
+            ( { model | aiConfig = cfg }, FileOps.saveAiConfig (AiConfig.encode cfg) )
+
+        AiKeyInput provider keyText ->
+            ( { model | aiKeyInput = Dict.insert provider keyText model.aiKeyInput }, Cmd.none )
+
+        SubmitApiKey provider ->
+            let
+                key =
+                    Dict.get provider model.aiKeyInput |> Maybe.withDefault ""
+            in
+            if String.isEmpty (String.trim key) then
+                ( model, Cmd.none )
+
+            else
+                request (PSetApiKey provider (AiConfig.last4 key))
+                    "set_api_key"
+                    [ ( "provider", E.string provider ), ( "key", E.string key ) ]
+                    model
+
+        DeleteApiKey provider ->
+            request (PDeleteApiKey provider)
+                "delete_api_key"
+                [ ( "provider", E.string provider ) ]
+                model
+
         ClickedBack ->
             case model.history of
                 prev :: rest ->
@@ -646,6 +687,22 @@ handleResponse op resp model =
 
                                 Nothing ->
                                     ( model, Cmd.none )
+
+                PSetApiKey provider hint ->
+                    let
+                        cfg =
+                            AiConfig.setHint provider hint model.aiConfig
+                    in
+                    ( { model | aiConfig = cfg, aiKeyInput = Dict.remove provider model.aiKeyInput }
+                    , FileOps.saveAiConfig (AiConfig.encode cfg)
+                    )
+
+                PDeleteApiKey provider ->
+                    let
+                        cfg =
+                            AiConfig.clearHint provider model.aiConfig
+                    in
+                    ( { model | aiConfig = cfg }, FileOps.saveAiConfig (AiConfig.encode cfg) )
 
 
 subscriptions : Model -> Sub Msg
