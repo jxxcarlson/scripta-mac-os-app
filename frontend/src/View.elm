@@ -1,4 +1,4 @@
-module View exposing (imagePane, plainTextPreview, themeName, view)
+module View exposing (imagePane, plainTextPreview, rightTabs, themeName, view)
 
 import AiConfig
 import Chat
@@ -565,6 +565,11 @@ terminalDock model =
             , ( "shell2", terminalTabContent (model.terminalTab == "shell2") (terminalPane "shell2" model) )
             ]
         ]
+
+
+rightTabs : List ( String, String )
+rightTabs =
+    [ ( "shell1", "Shell 1" ), ( "shell2", "Shell 2" ), ( "scratch", "Scratch" ) ]
 
 
 terminalTabBar : Model -> Html Msg
