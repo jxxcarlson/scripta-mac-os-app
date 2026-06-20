@@ -115,5 +115,6 @@ type Msg
     | DeleteApiKey String
     | ToggledTerminal
     | SelectTerminalTab String
+    | CopyReply String
     | ChatInput String
     | SendChat

@@ -435,6 +435,9 @@
       subscribePort('saveTerminalVisible', (on) => {
         try { localStorage.setItem('terminalVisible', on ? 'true' : 'false'); } catch (e) {}
       });
+      subscribePort('copyToClipboard', (text) => {
+        navigator.clipboard.writeText(text).catch(() => {});
+      });
       subscribePort('saveLastVault', (vault) => {
         invoke('set_last_vault', { vault: vault }).catch(() => {});
       });

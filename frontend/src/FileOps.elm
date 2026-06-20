@@ -1,7 +1,7 @@
 port module FileOps exposing
     ( FsResponse
     , fsRequest, fsResponse, fileChanged, openFile
-    , scrollAndHighlight
+    , scrollAndHighlight, copyToClipboard
     , saveOpenFolders, requestOpenFolders, gotOpenFolders
     , saveReaderMode, saveLastVault, saveFullParse, saveIsLight, saveAiConfig, saveTerminalVisible
     , encodeRequest, responseDecoder, resultOf
@@ -57,6 +57,9 @@ port saveAiConfig : E.Value -> Cmd msg
 
 
 port scrollAndHighlight : String -> Cmd msg
+
+
+port copyToClipboard : String -> Cmd msg
 
 
 type alias FsResponse =

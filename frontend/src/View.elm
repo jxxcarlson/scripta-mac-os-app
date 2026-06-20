@@ -1,4 +1,4 @@
-module View exposing (imagePane, plainTextPreview, rightTabs, themeName, view)
+module View exposing (chatMessageView, imagePane, plainTextPreview, rightTabs, themeName, view)
 
 import AiConfig
 import Chat
@@ -698,15 +698,36 @@ chatMessageView m =
                 "var(--panel-bg)"
             )
         ]
-        (div [ style "font-size" "11px", style "font-weight" "700", style "color" "var(--muted)", style "margin-bottom" "4px" ]
-            [ text
+        (div
+            [ style "display" "flex"
+            , style "align-items" "center"
+            , style "gap" "8px"
+            , style "font-size" "11px"
+            , style "font-weight" "700"
+            , style "color" "var(--muted)"
+            , style "margin-bottom" "4px"
+            ]
+            (text
                 (if isUser then
                     "You"
 
                  else
                     "Assistant"
                 )
-            ]
+                :: (if isUser then
+                        []
+
+                    else
+                        [ button
+                            [ onClick (CopyReply m.content)
+                            , style "font-size" "10px"
+                            , style "font-weight" "400"
+                            , style "padding" "0 6px"
+                            ]
+                            [ text "Copy" ]
+                        ]
+                   )
+            )
             :: body
         )
 

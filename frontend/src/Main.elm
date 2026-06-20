@@ -495,6 +495,9 @@ update msg model =
         SelectTerminalTab tab ->
             ( { model | terminalTab = tab }, Cmd.none )
 
+        CopyReply text ->
+            ( model, FileOps.copyToClipboard text )
+
         ToggledSettings ->
             ( { model | showSettings = not model.showSettings }, Cmd.none )
 
