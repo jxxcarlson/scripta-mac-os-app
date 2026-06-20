@@ -2,6 +2,7 @@ module MarkdownRenderTest exposing (suite)
 
 import Expect
 import Html
+import Html.Attributes
 import MarkdownRender
 import Render
 import Test exposing (Test, describe, test)
@@ -81,6 +82,22 @@ suite =
                     |> Html.div []
                     |> Query.fromHtml
                     |> Query.has [ Selector.tag "math-text" ]
+        , test "single-line $$...$$ renders a display math-text" <|
+            \_ ->
+                MarkdownRender.render "$$a^2 + b^2 = c^2$$"
+                    |> .body
+                    |> Html.div []
+                    |> Query.fromHtml
+                    |> Query.find [ Selector.tag "math-text" ]
+                    |> Query.has [ Selector.attribute (Html.Attributes.attribute "display" "true") ]
+        , test "multi-line $$ block still renders a display math-text" <|
+            \_ ->
+                MarkdownRender.render "$$\na^2 + b^2 = c^2\n$$"
+                    |> .body
+                    |> Html.div []
+                    |> Query.fromHtml
+                    |> Query.find [ Selector.tag "math-text" ]
+                    |> Query.has [ Selector.attribute (Html.Attributes.attribute "display" "true") ]
         , test "classifies a pdf target as external" <|
             \_ ->
                 Expect.equal MarkdownRender.External (MarkdownRender.classifyLink "III_The_Rose.pdf")

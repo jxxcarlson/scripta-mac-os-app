@@ -930,13 +930,44 @@ displayMathCloseRegex =
         |> Maybe.withDefault Regex.never
 
 
+{-| Local patch (Mac Scripta Viewer): a whole `$$ … $$` on one line. Upstream
+this fork only handled `$$` block-delimited on their own lines; this also accepts
+a single-line display-math span. Re-apply if re-vendoring elm-markdown.
+-}
+displayMathInlineRegex : Regex
+displayMathInlineRegex =
+    Regex.fromString "^\\s{0,3}\\$\\$(.+?)\\$\\$\\s*$"
+        |> Maybe.withDefault Regex.never
+
+
+firstSubmatch : Regex -> String -> Maybe String
+firstSubmatch regex str =
+    case Regex.find regex str of
+        match :: _ ->
+            case match.submatches of
+                sub :: _ ->
+                    sub
+
+                [] ->
+                    Nothing
+
+        [] ->
+            Nothing
+
+
 checkDisplayMathLine : ( String, List (Block b i) ) -> Result ( String, List (Block b i) ) (List (Block b i))
 checkDisplayMathLine ( rawLine, ast ) =
-    if Regex.contains displayMathOpenRegex rawLine then
-        Ok (DisplayMath True "" :: ast)
+    case firstSubmatch displayMathInlineRegex rawLine of
+        Just content ->
+            -- Whole `$$ … $$` on one line → a closed display-math block.
+            Ok (DisplayMath False (String.trim content) :: ast)
 
-    else
-        Err ( rawLine, ast )
+        Nothing ->
+            if Regex.contains displayMathOpenRegex rawLine then
+                Ok (DisplayMath True "" :: ast)
+
+            else
+                Err ( rawLine, ast )
 
 
 isDisplayMathClose : String -> Bool
