@@ -6,6 +6,7 @@ import Editor
 import Html exposing (Html, button, div, li, span, text, ul)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick, onInput)
+import Html.Keyed
 import Json.Decode as D
 import Language
 import MarkdownRender
@@ -110,6 +111,7 @@ view model =
                         )
                     ]
                 , button [ onClick ToggledSettings ] [ text "\u{2699} Settings" ]
+                , button [ onClick ToggledTerminal ] [ text "\u{2318} Terminal" ]
                 , Html.input
                     [ Html.Attributes.placeholder "new-file-name"
                     , Html.Attributes.value model.newName
@@ -226,6 +228,12 @@ view model =
         (conflictBanner model
             ++ errorBanner model
             ++ [ toolbar, body ]
+            ++ (if model.terminalEverOpened then
+                    [ terminalDock model ]
+
+                else
+                    []
+               )
             ++ (if model.showSettings then
                     [ settingsOverlay model ]
 
@@ -521,6 +529,103 @@ settingsOverlay model =
             , div [] (List.map (providerRow model) AiConfig.providers)
             ]
         ]
+
+
+terminalDock : Model -> Html Msg
+terminalDock model =
+    div
+        [ style "display"
+            (if model.terminalVisible then
+                "flex"
+
+             else
+                "none"
+            )
+        , style "flex-direction" "column"
+        , style "height" "var(--terminal-height)"
+        , style "border-top" "1px solid var(--border)"
+        , style "background" "var(--app-bg)"
+        , style "min-height" "0"
+        ]
+        [ div
+            [ Html.Attributes.id "terminal-resize-handle"
+            , style "height" "6px"
+            , style "cursor" "row-resize"
+            , style "background" "var(--border)"
+            , style "flex" "0 0 auto"
+            ]
+            []
+        , terminalTabBar model
+        , Html.Keyed.node "div"
+            [ style "flex" "1", style "min-height" "0", style "position" "relative" ]
+            [ ( "ai", terminalTabContent (model.terminalTab == "ai") aiPlaceholder )
+            , ( "shell1", terminalTabContent (model.terminalTab == "shell1") (terminalPane "shell1" model) )
+            , ( "shell2", terminalTabContent (model.terminalTab == "shell2") (terminalPane "shell2" model) )
+            ]
+        ]
+
+
+terminalTabBar : Model -> Html Msg
+terminalTabBar model =
+    div
+        [ style "display" "flex"
+        , style "gap" "4px"
+        , style "padding" "4px 8px"
+        , style "flex" "0 0 auto"
+        , style "border-bottom" "1px solid var(--border)"
+        ]
+        (List.map (terminalTabButton model)
+            [ ( "ai", "AI" ), ( "shell1", "Shell 1" ), ( "shell2", "Shell 2" ) ]
+        )
+
+
+terminalTabButton : Model -> ( String, String ) -> Html Msg
+terminalTabButton model ( tabId, label ) =
+    button
+        [ onClick (SelectTerminalTab tabId)
+        , style "font-weight"
+            (if model.terminalTab == tabId then
+                "700"
+
+             else
+                "400"
+            )
+        ]
+        [ text label ]
+
+
+terminalTabContent : Bool -> Html Msg -> Html Msg
+terminalTabContent active content =
+    div
+        [ style "position" "absolute"
+        , style "inset" "0"
+        , style "display"
+            (if active then
+                "block"
+
+             else
+                "none"
+            )
+        ]
+        [ content ]
+
+
+aiPlaceholder : Html Msg
+aiPlaceholder =
+    div [ style "padding" "16px", style "color" "var(--muted)" ]
+        [ text "AI chat — coming in the next step." ]
+
+
+terminalPane : String -> Model -> Html Msg
+terminalPane termId model =
+    Html.node "terminal-pane"
+        [ Html.Attributes.attribute "term-id" termId
+        , Html.Attributes.attribute "cwd" (Maybe.withDefault "" model.vaultRoot)
+        , style "display" "block"
+        , style "width" "100%"
+        , style "height" "100%"
+        ]
+        []
 
 
 activeProviderRow : Model -> Html Msg
