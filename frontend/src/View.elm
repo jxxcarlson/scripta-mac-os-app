@@ -56,6 +56,7 @@ view model =
                 [ treeColumn model
                 , Html.node "codemirror-editor"
                     [ Html.Attributes.attribute "text" model.loadedContent
+                    , Html.Attributes.attribute "fill-parent" ""
                     , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
                     , style "flex" "1"
                     , style "border-right" "1px solid var(--border)"
