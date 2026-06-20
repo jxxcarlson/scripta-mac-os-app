@@ -11,7 +11,7 @@ pub fn build_anthropic_body(model: &str, messages: &[ChatMessage]) -> Value {
         .iter()
         .map(|m| json!({ "role": m.role, "content": m.content }))
         .collect();
-    json!({ "model": model, "max_tokens": 4096, "messages": msgs })
+    json!({ "model": model, "max_tokens": 8192, "messages": msgs })
 }
 
 pub fn parse_anthropic_reply(body: &Value) -> Result<String, String> {
@@ -57,7 +57,7 @@ mod tests {
         let msgs = vec![ChatMessage { role: "user".into(), content: "hi".into() }];
         let b = build_anthropic_body("claude-sonnet-4-6", &msgs);
         assert_eq!(b["model"], "claude-sonnet-4-6");
-        assert_eq!(b["max_tokens"], 4096);
+        assert_eq!(b["max_tokens"], 8192);
         assert_eq!(b["messages"][0]["role"], "user");
         assert_eq!(b["messages"][0]["content"], "hi");
     }
