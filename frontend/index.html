@@ -302,7 +302,8 @@
         readerMode: lsGet('readerMode') === 'true',  // bool
         fullParse: lsGet('fullParse') !== 'false',   // bool (unset → Full)
         isLight: lsGet('isLight') !== 'false',       // bool (unset → Light)
-        aiConfig: JSON.parse(lsGet('aiConfig') || 'null')   // object | null
+        aiConfig: JSON.parse(lsGet('aiConfig') || 'null'),   // object | null
+        terminalVisible: lsGet('terminalVisible') === 'true'   // bool (unset → hidden)
       };
       const app = Elm.Main.init({ node: document.getElementById('app'), flags: flags });
 
@@ -365,6 +366,9 @@
       });
       subscribePort('saveAiConfig', (cfg) => {
         try { localStorage.setItem('aiConfig', JSON.stringify(cfg)); } catch (e) {}
+      });
+      subscribePort('saveTerminalVisible', (on) => {
+        try { localStorage.setItem('terminalVisible', on ? 'true' : 'false'); } catch (e) {}
       });
       subscribePort('saveLastVault', (vault) => {
         invoke('set_last_vault', { vault: vault }).catch(() => {});

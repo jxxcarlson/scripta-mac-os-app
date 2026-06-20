@@ -67,6 +67,9 @@ init flagsValue =
         , aiConfig = flags.aiConfig
         , aiKeyInput = Dict.empty
         , showSettings = False
+        , terminalVisible = flags.terminalVisible
+        , terminalEverOpened = flags.terminalVisible
+        , terminalTab = "ai"
         }
 
 
@@ -474,6 +477,18 @@ update msg model =
                     not model.isLight
             in
             ( { model | isLight = light }, FileOps.saveIsLight light )
+
+        ToggledTerminal ->
+            let
+                visible =
+                    not model.terminalVisible
+            in
+            ( { model | terminalVisible = visible, terminalEverOpened = model.terminalEverOpened || visible }
+            , FileOps.saveTerminalVisible visible
+            )
+
+        SelectTerminalTab tab ->
+            ( { model | terminalTab = tab }, Cmd.none )
 
         ToggledSettings ->
             ( { model | showSettings = not model.showSettings }, Cmd.none )

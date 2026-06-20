@@ -79,4 +79,8 @@ suite =
                         E.object [ ( "aiConfig", AiConfig.encode cfg ) ]
                 in
                 Expect.equal "gemini" (Flags.decode v).aiConfig.activeProvider
+        , test "missing terminalVisible defaults to False" <|
+            \_ -> Expect.equal False (Flags.decode (E.object [])).terminalVisible
+        , test "terminalVisible true decodes to True" <|
+            \_ -> Expect.equal True (Flags.decode (E.object [ ( "terminalVisible", E.bool True ) ])).terminalVisible
         ]

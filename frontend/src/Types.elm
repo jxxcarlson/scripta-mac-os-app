@@ -38,6 +38,9 @@ type alias Model =
     , aiConfig : AiConfig.AiConfig
     , aiKeyInput : Dict String String
     , showSettings : Bool
+    , terminalVisible : Bool
+    , terminalEverOpened : Bool
+    , terminalTab : String
     }
 
 
@@ -104,3 +107,5 @@ type Msg
     | AiKeyInput String String
     | SubmitApiKey String
     | DeleteApiKey String
+    | ToggledTerminal
+    | SelectTerminalTab String

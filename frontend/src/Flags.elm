@@ -15,6 +15,7 @@ type alias Flags =
     , fullParse : Bool
     , isLight : Bool
     , aiConfig : AiConfig.AiConfig
+    , terminalVisible : Bool
     }
 
 
@@ -35,4 +36,7 @@ decode value =
     , aiConfig =
         D.decodeValue (D.field "aiConfig" AiConfig.decoder) value
             |> Result.withDefault AiConfig.init
+    , terminalVisible =
+        D.decodeValue (D.field "terminalVisible" D.bool) value
+            |> Result.withDefault False
     }
