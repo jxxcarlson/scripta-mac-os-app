@@ -1,5 +1,7 @@
 module View exposing (imagePane, plainTextPreview, themeName, view)
 
+import AiConfig
+import Dict
 import Editor
 import Html exposing (Html, button, div, li, span, text, ul)
 import Html.Attributes exposing (style)
@@ -107,6 +109,7 @@ view model =
                             "Light"
                         )
                     ]
+                , button [ onClick ToggledSettings ] [ text "\u{2699} Settings" ]
                 , Html.input
                     [ Html.Attributes.placeholder "new-file-name"
                     , Html.Attributes.value model.newName
@@ -220,7 +223,16 @@ view model =
         , style "background" "var(--app-bg)"
         , style "color" "var(--app-fg)"
         ]
-        (conflictBanner model ++ errorBanner model ++ [ toolbar, body ])
+        (conflictBanner model
+            ++ errorBanner model
+            ++ [ toolbar, body ]
+            ++ (if model.showSettings then
+                    [ settingsOverlay model ]
+
+                else
+                    []
+               )
+        )
 
 
 conflictBanner : Model -> List (Html Msg)
@@ -474,3 +486,100 @@ previewBody model =
 
         ( Nothing, _ ) ->
             [ Html.text "Open a document." ]
+
+
+settingsOverlay : Model -> Html Msg
+settingsOverlay model =
+    div
+        [ style "position" "fixed"
+        , style "inset" "0"
+        , style "background" "rgba(0,0,0,0.4)"
+        , style "display" "flex"
+        , style "align-items" "flex-start"
+        , style "justify-content" "center"
+        , style "padding" "40px"
+        , style "overflow" "auto"
+        , style "z-index" "100"
+        ]
+        [ div
+            [ style "background" "var(--app-bg)"
+            , style "color" "var(--app-fg)"
+            , style "border" "1px solid var(--border)"
+            , style "border-radius" "8px"
+            , style "padding" "20px"
+            , style "width" "560px"
+            , style "max-width" "100%"
+            ]
+            [ div [ style "display" "flex", style "justify-content" "space-between", style "align-items" "center", style "margin-bottom" "12px" ]
+                [ Html.h2 [ style "margin" "0", style "font-size" "18px" ] [ text "AI Providers" ]
+                , button [ onClick ToggledSettings ] [ text "Close" ]
+                ]
+            , div [ style "color" "var(--muted)", style "font-size" "12px", style "margin-bottom" "16px" ]
+                [ text "Keys are stored in your macOS Keychain. Only the last 4 characters are shown back." ]
+            , activeProviderRow model
+            , div [ style "height" "12px" ] []
+            , div [] (List.map (providerRow model) AiConfig.providers)
+            ]
+        ]
+
+
+activeProviderRow : Model -> Html Msg
+activeProviderRow model =
+    div [ style "display" "flex", style "align-items" "center", style "gap" "8px", style "margin-bottom" "8px" ]
+        [ Html.label [ style "font-weight" "600", style "font-size" "13px" ] [ text "Active provider:" ]
+        , Html.select [ onInput SetActiveProvider ]
+            (List.map
+                (\p ->
+                    Html.option
+                        [ Html.Attributes.value p, Html.Attributes.selected (p == AiConfig.activeProvider model.aiConfig) ]
+                        [ text (AiConfig.providerLabel p) ]
+                )
+                AiConfig.providers
+            )
+        ]
+
+
+providerRow : Model -> String -> Html Msg
+providerRow model provider =
+    let
+        keyText =
+            Dict.get provider model.aiKeyInput |> Maybe.withDefault ""
+    in
+    div
+        [ style "border-top" "1px solid var(--border)"
+        , style "padding" "12px 0"
+        ]
+        [ div [ style "display" "flex", style "align-items" "center", style "gap" "8px" ]
+            [ div [ style "font-weight" "600", style "width" "90px" ] [ text (AiConfig.providerLabel provider) ]
+            , Html.select [ onInput (SetProviderModel provider) ]
+                (List.map
+                    (\m ->
+                        Html.option
+                            [ Html.Attributes.value m, Html.Attributes.selected (m == AiConfig.modelFor provider model.aiConfig) ]
+                            [ text m ]
+                    )
+                    (AiConfig.modelsFor provider)
+                )
+            ]
+        , div [ style "display" "flex", style "align-items" "center", style "gap" "8px", style "margin-top" "8px" ]
+            [ Html.input
+                [ Html.Attributes.type_ "password"
+                , Html.Attributes.placeholder "Paste your API key"
+                , Html.Attributes.value keyText
+                , onInput (AiKeyInput provider)
+                , style "flex" "1"
+                ]
+                []
+            , button [ onClick (SubmitApiKey provider) ] [ text "Set" ]
+            , case AiConfig.keyHint provider model.aiConfig of
+                Just hint ->
+                    span [ style "display" "flex", style "align-items" "center", style "gap" "8px" ]
+                        [ span [ style "color" "var(--muted)", style "font-family" "ui-monospace, monospace", style "font-size" "12px" ]
+                            [ text ("key: \u{2022}\u{2022}\u{2022}\u{2022}" ++ hint) ]
+                        , button [ onClick (DeleteApiKey provider) ] [ text "Delete" ]
+                        ]
+
+                Nothing ->
+                    span [ style "color" "var(--muted)", style "font-size" "12px" ] [ text "no key" ]
+            ]
+        ]
