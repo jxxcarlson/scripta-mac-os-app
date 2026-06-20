@@ -1,5 +1,6 @@
 module FlagsTest exposing (suite)
 
+import AiConfig
 import Expect
 import Flags
 import Json.Encode as E
@@ -65,4 +66,17 @@ suite =
         , test "isLight true decodes to True" <|
             \_ ->
                 Expect.equal True (Flags.decode (E.object [ ( "isLight", E.bool True ) ])).isLight
+        , test "missing aiConfig decodes to AiConfig.init" <|
+            \_ ->
+                Expect.equal AiConfig.init (Flags.decode (E.object [])).aiConfig
+        , test "aiConfig is decoded when present" <|
+            \_ ->
+                let
+                    cfg =
+                        AiConfig.setActiveProvider "gemini" AiConfig.init
+
+                    v =
+                        E.object [ ( "aiConfig", AiConfig.encode cfg ) ]
+                in
+                Expect.equal "gemini" (Flags.decode v).aiConfig.activeProvider
         ]

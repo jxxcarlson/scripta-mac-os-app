@@ -63,6 +63,9 @@ init flagsValue =
         , readerMode = flags.readerMode
         , fullParse = flags.fullParse
         , initialLastVault = flags.lastVault
+        , aiConfig = flags.aiConfig
+        , aiKeyInput = Dict.empty
+        , showSettings = False
         }
 
 

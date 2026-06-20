@@ -1,5 +1,6 @@
 module Types exposing (Model, Msg(..), PendingOp(..), Pane(..))
 
+import AiConfig
 import Dict exposing (Dict)
 import Json.Decode as D
 import Language
@@ -34,6 +35,9 @@ type alias Model =
     , readerMode : Bool
     , fullParse : Bool
     , initialLastVault : Maybe String
+    , aiConfig : AiConfig.AiConfig
+    , aiKeyInput : Dict String String
+    , showSettings : Bool
     }
 
 

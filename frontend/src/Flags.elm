@@ -5,6 +5,7 @@ Rust-owned file, `readerMode` from localStorage). Decoding is tolerant: any
 missing or malformed field falls back to a default.
 -}
 
+import AiConfig
 import Json.Decode as D
 
 
@@ -13,6 +14,7 @@ type alias Flags =
     , readerMode : Bool
     , fullParse : Bool
     , isLight : Bool
+    , aiConfig : AiConfig.AiConfig
     }
 
 
@@ -30,4 +32,7 @@ decode value =
     , isLight =
         D.decodeValue (D.field "isLight" D.bool) value
             |> Result.withDefault True
+    , aiConfig =
+        D.decodeValue (D.field "aiConfig" AiConfig.decoder) value
+            |> Result.withDefault AiConfig.init
     }

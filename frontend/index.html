@@ -224,7 +224,8 @@
         lastVault: lastVault,                        // string | null (from Rust)
         readerMode: lsGet('readerMode') === 'true',  // bool
         fullParse: lsGet('fullParse') !== 'false',   // bool (unset → Full)
-        isLight: lsGet('isLight') !== 'false'        // bool (unset → Light)
+        isLight: lsGet('isLight') !== 'false',       // bool (unset → Light)
+        aiConfig: JSON.parse(lsGet('aiConfig') || 'null')   // object | null
       };
       const app = Elm.Main.init({ node: document.getElementById('app'), flags: flags });
 
@@ -284,6 +285,9 @@
       });
       subscribePort('saveIsLight', (on) => {
         try { localStorage.setItem('isLight', on ? 'true' : 'false'); } catch (e) {}
+      });
+      subscribePort('saveAiConfig', (cfg) => {
+        try { localStorage.setItem('aiConfig', JSON.stringify(cfg)); } catch (e) {}
       });
       subscribePort('saveLastVault', (vault) => {
         invoke('set_last_vault', { vault: vault }).catch(() => {});
