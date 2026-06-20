@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import AiConfig
 import Browser
+import Chat
 import Dict
 import Export
 import FileOps
@@ -70,6 +71,9 @@ init flagsValue =
         , terminalVisible = flags.terminalVisible
         , terminalEverOpened = flags.terminalVisible
         , terminalTab = "ai"
+        , chatMessages = []
+        , chatInput = ""
+        , chatPending = False
         }
 
 
@@ -562,6 +566,33 @@ update msg model =
                 Err _ ->
                     ( model, Cmd.none )
 
+        ChatInput t ->
+            ( { model | chatInput = t }, Cmd.none )
+
+        SendChat ->
+            let
+                text =
+                    String.trim model.chatInput
+            in
+            if model.chatPending || String.isEmpty text then
+                ( model, Cmd.none )
+
+            else
+                let
+                    provider =
+                        AiConfig.activeProvider model.aiConfig
+
+                    msgs =
+                        model.chatMessages ++ [ Chat.user text ]
+                in
+                request PChatReply
+                    "ai_chat"
+                    [ ( "provider", E.string provider )
+                    , ( "model", E.string (AiConfig.modelFor provider model.aiConfig) )
+                    , ( "messages", E.list Chat.encode msgs )
+                    ]
+                    { model | chatMessages = msgs, chatInput = "", chatPending = True }
+
         GotFsResponse value ->
             case D.decodeValue FileOps.responseDecoder value of
                 Err e ->
@@ -580,16 +611,21 @@ handleResponse : PendingOp -> FileOps.FsResponse -> Model -> ( Model, Cmd Msg )
 handleResponse op resp model =
     case FileOps.resultOf resp of
         Err e ->
-            let
-                newSaveState =
-                    case op of
-                        PWriteFile _ ->
-                            Tuple.first (SaveState.saveFailed model.saveState)
+            case op of
+                PChatReply ->
+                    ( { model | chatMessages = model.chatMessages ++ [ Chat.assistant ("\u{26A0} " ++ e) ], chatPending = False }, Cmd.none )
 
-                        _ ->
-                            model.saveState
-            in
-            ( { model | error = Just e, saveState = newSaveState }, Cmd.none )
+                _ ->
+                    let
+                        newSaveState =
+                            case op of
+                                PWriteFile _ ->
+                                    Tuple.first (SaveState.saveFailed model.saveState)
+
+                                _ ->
+                                    model.saveState
+                    in
+                    ( { model | error = Just e, saveState = newSaveState }, Cmd.none )
 
         Ok result ->
             case op of
@@ -718,6 +754,14 @@ handleResponse op resp model =
                             AiConfig.clearHint provider model.aiConfig
                     in
                     ( { model | aiConfig = cfg }, FileOps.saveAiConfig (AiConfig.encode cfg) )
+
+                PChatReply ->
+                    case D.decodeValue D.string result of
+                        Ok reply ->
+                            ( { model | chatMessages = model.chatMessages ++ [ Chat.assistant reply ], chatPending = False }, Cmd.none )
+
+                        Err e ->
+                            ( { model | chatMessages = model.chatMessages ++ [ Chat.assistant ("\u{26A0} " ++ D.errorToString e) ], chatPending = False }, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg

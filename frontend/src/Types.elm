@@ -1,6 +1,7 @@
 module Types exposing (Model, Msg(..), PendingOp(..), Pane(..))
 
 import AiConfig
+import Chat
 import Dict exposing (Dict)
 import Json.Decode as D
 import Language
@@ -41,6 +42,9 @@ type alias Model =
     , terminalVisible : Bool
     , terminalEverOpened : Bool
     , terminalTab : String
+    , chatMessages : List Chat.ChatMessage
+    , chatInput : String
+    , chatPending : Bool
     }
 
 
@@ -64,6 +68,7 @@ type PendingOp
     | PResolveDocLink
     | PSetApiKey String String
     | PDeleteApiKey String
+    | PChatReply
 
 
 type Pane
@@ -109,3 +114,5 @@ type Msg
     | DeleteApiKey String
     | ToggledTerminal
     | SelectTerminalTab String
+    | ChatInput String
+    | SendChat
