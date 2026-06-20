@@ -759,6 +759,7 @@ scratchPane model =
     Html.node "codemirror-editor"
         [ Html.Attributes.id "scratch-editor"
         , Html.Attributes.attribute "text" model.scratchContent
+        , Html.Attributes.attribute "fill-parent" ""
         , style "display" "block"
         , style "width" "100%"
         , style "height" "100%"
