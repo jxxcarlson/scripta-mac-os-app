@@ -498,6 +498,9 @@ update msg model =
         CopyReply text ->
             ( model, FileOps.copyToClipboard text )
 
+        ClickedReload ->
+            relist model
+
         ToggledSettings ->
             ( { model | showSettings = not model.showSettings }, Cmd.none )
 

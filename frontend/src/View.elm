@@ -24,7 +24,14 @@ import Workspace exposing (Node(..))
 treeColumn : Model -> Html Msg
 treeColumn model =
     div [ style "width" "calc(260px + 2mm)", style "border-right" "1px solid var(--border)", style "padding" "8px", style "overflow" "auto", style "background" "var(--panel-bg)" ]
-        (button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
+        (div [ style "display" "flex", style "gap" "4px" ]
+            [ button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
+            , button
+                [ onClick ClickedReload
+                , Html.Attributes.disabled (model.vaultRoot == Nothing)
+                ]
+                [ text "Reload" ]
+            ]
             :: [ searchBox model
                , fileTree model
                , div [ style "margin-top" "4px", style "display" "flex", style "gap" "2mm" ]

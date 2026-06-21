@@ -116,5 +116,6 @@ type Msg
     | ToggledTerminal
     | SelectTerminalTab String
     | CopyReply String
+    | ClickedReload
     | ChatInput String
     | SendChat
