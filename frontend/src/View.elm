@@ -26,6 +26,7 @@ treeColumn model =
     div [ style "width" "calc(260px + 2mm)", style "border-right" "1px solid var(--border)", style "padding" "8px", style "overflow" "auto", style "background" "var(--panel-bg)" ]
         (div [ style "display" "flex", style "gap" "4px" ]
             [ button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
+            , button [ onClick ClickedChangeVault ] [ text "Change Vault" ]
             , button
                 [ onClick ClickedReload
                 , Html.Attributes.disabled (model.vaultRoot == Nothing)
@@ -134,7 +135,6 @@ view model =
                 , button [ onClick ClickedNewFile ] [ text "New" ]
                 , button [ onClick ClickedRename ] [ text "Rename" ]
                 , button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
-                , button [ onClick ClickedChangeVault ] [ text "Change Vault" ]
                 , div [ style "font-size" "12px", style "color" "var(--muted)" ]
                     [ text (saveLabel model.saveState.saveStatus) ]
                 ]
