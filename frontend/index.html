@@ -119,7 +119,7 @@
       }
 
       button, .cm-button {
-        background: #3b3f45;
+        background: #2b2c40;
         color: #fff;
         border: 1px solid #555;
         border-radius: 4px;
@@ -128,8 +128,10 @@
         font-size: 12px;
         cursor: pointer;
         background-image: none;
+        transition: background 0.08s ease, transform 0.05s ease;
       }
-      button:hover, .cm-button:hover { background: #4a4e55; }
+      button:hover, .cm-button:hover { background: #3a3c55; }
+      button:active, .cm-button:active { background: #1f2030 !important; transform: translateY(1px); }
 
       .lr-sync-highlight {
         background-color: #cfe6fb;
@@ -153,11 +155,11 @@
          wins the cascade. Force light-on-charcoal to match the app buttons. */
       .cm-button {
         color: #fff !important;
-        background: #3b3f45 !important;
+        background: #2b2c40 !important;
         background-image: none !important;
         border: 1px solid #555 !important;
       }
-      .cm-button:hover { background: #4a4e55 !important; }
+      .cm-button:hover { background: #3a3c55 !important; }
     </style>
   </head>
   <body>
