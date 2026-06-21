@@ -707,8 +707,27 @@ handleResponse op resp model =
                         Err _ ->
                             update (GotSaveResult resp.requestId) model
 
-                PCreateFile _ ->
-                    relist model
+                PCreateFile path ->
+                    let
+                        expanded =
+                            { model
+                                | openFolders =
+                                    List.foldl Set.insert model.openFolders (PathUtil.ancestorDirs path)
+                            }
+
+                        ( opened, openCmd ) =
+                            openDoc path expanded
+
+                        ( relisted, relistCmd ) =
+                            relist opened
+                    in
+                    ( relisted
+                    , Cmd.batch
+                        [ openCmd
+                        , relistCmd
+                        , saveOpenFoldersCmd relisted.vaultRoot relisted.openFolders
+                        ]
+                    )
 
                 PCreateDir _ ->
                     relist model
