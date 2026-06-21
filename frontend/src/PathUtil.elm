@@ -1,4 +1,4 @@
-module PathUtil exposing (basename, kbaseRoot, parentDir, siblingPath)
+module PathUtil exposing (ancestorDirs, basename, kbaseRoot, parentDir, siblingPath)
 
 {-| Small '/'-separated path helpers shared by the file-open logic.
 -}
@@ -21,6 +21,30 @@ parentDir path =
 
         [] ->
             ""
+
+
+{-| Every ancestor folder of a '/'-separated path, outermost first. The final
+segment (the file name) is dropped. So `"a/b/c.md"` yields `["a", "a/b"]`,
+`"Inbox/foo.md"` yields `["Inbox"]`, and a bare `"foo.md"` yields `[]`.
+-}
+ancestorDirs : String -> List String
+ancestorDirs path =
+    let
+        folders =
+            path |> String.split "/" |> List.reverse |> List.drop 1 |> List.reverse
+    in
+    folders
+        |> List.foldl
+            (\seg acc ->
+                case acc of
+                    prev :: _ ->
+                        (prev ++ "/" ++ seg) :: acc
+
+                    [] ->
+                        [ seg ]
+            )
+            []
+        |> List.reverse
 
 
 {-| If `path` contains a directory segment named "kbase", return the path

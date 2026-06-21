@@ -40,4 +40,10 @@ suite =
         , test "kbaseRoot requires an exact segment match (not a prefix)" <|
             \_ ->
                 Expect.equal Nothing (PathUtil.kbaseRoot "/Users/c/kbase-backup/x")
+        , test "ancestorDirs of a nested path lists each ancestor folder" <|
+            \_ -> Expect.equal [ "a", "a/b" ] (PathUtil.ancestorDirs "a/b/c.md")
+        , test "ancestorDirs of a single-folder path" <|
+            \_ -> Expect.equal [ "Inbox" ] (PathUtil.ancestorDirs "Inbox/foo.md")
+        , test "ancestorDirs of a root-level file is empty" <|
+            \_ -> Expect.equal [] (PathUtil.ancestorDirs "foo.md")
         ]
