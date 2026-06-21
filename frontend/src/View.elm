@@ -741,13 +741,17 @@ chatMessageView m =
 
 chatInputRow : Model -> Html Msg
 chatInputRow model =
-    div [ style "display" "flex", style "gap" "8px", style "padding" "8px", style "border-top" "1px solid var(--border)" ]
-        [ Html.input
+    div [ style "display" "flex", style "gap" "8px", style "padding" "8px", style "border-top" "1px solid var(--border)", style "align-items" "flex-end" ]
+        [ Html.textarea
             [ Html.Attributes.placeholder "Message the AI\u{2026}"
             , Html.Attributes.value model.chatInput
             , onInput ChatInput
-            , Html.Events.on "keydown" chatEnterDecoder
+            , Html.Events.preventDefaultOn "keydown" chatKeydownDecoder
+            , Html.Attributes.rows 3
             , style "flex" "1"
+            , style "resize" "vertical"
+            , style "font" "inherit"
+            , style "min-height" "2.5em"
             ]
             []
         , button
@@ -758,16 +762,18 @@ chatInputRow model =
         ]
 
 
-chatEnterDecoder : D.Decoder Msg
-chatEnterDecoder =
-    D.field "key" D.string
+chatKeydownDecoder : D.Decoder ( Msg, Bool )
+chatKeydownDecoder =
+    D.map2 Tuple.pair (D.field "key" D.string) (D.field "shiftKey" D.bool)
         |> D.andThen
-            (\k ->
-                if k == "Enter" then
-                    D.succeed SendChat
+            (\( key, shift ) ->
+                if key == "Enter" && not shift then
+                    -- send, and preventDefault so no newline is inserted
+                    D.succeed ( SendChat, True )
 
                 else
-                    D.fail "not Enter"
+                    -- Shift+Enter (and everything else) falls through to the textarea
+                    D.fail "not plain Enter"
             )
 
 
