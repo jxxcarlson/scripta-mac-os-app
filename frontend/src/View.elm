@@ -845,24 +845,39 @@ chatKeydownDecoder =
 
 terminalPane : String -> Model -> Html Msg
 terminalPane termId model =
-    let
-        initCmd =
-            case ( termId, model.vaultRoot ) of
-                ( "shell1", Just root ) ->
-                    "cd '" ++ root ++ "' && " ++ AiConfig.effectiveAgentCommand model.aiConfig
+    case ( termId, model.vaultRoot ) of
+        ( "shell1", Nothing ) ->
+            -- Defer opening the agent shell's pty until the vault is restored at
+            -- startup. The cd+agent auto-run is write-once on first open, so
+            -- opening before vaultRoot is known would land the shell in $HOME and
+            -- permanently skip the agent for the session.
+            div
+                [ style "padding" "12px"
+                , style "color" "var(--muted)"
+                ]
+                [ text "Open a vault to start the agent shell." ]
 
-                _ ->
-                    ""
-    in
-    Html.node "terminal-pane"
-        [ Html.Attributes.attribute "term-id" termId
-        , Html.Attributes.attribute "cwd" (Maybe.withDefault "" model.vaultRoot)
-        , Html.Attributes.attribute "init-cmd" initCmd
-        , style "display" "block"
-        , style "width" "100%"
-        , style "height" "100%"
-        ]
-        []
+        _ ->
+            let
+                initCmd =
+                    case ( termId, model.vaultRoot ) of
+                        ( "shell1", Just root ) ->
+                            -- NOTE: single-quote wrapping only; a literal ' in the
+                            -- vault path is unsupported (out of scope).
+                            "cd '" ++ root ++ "' && " ++ AiConfig.effectiveAgentCommand model.aiConfig
+
+                        _ ->
+                            ""
+            in
+            Html.node "terminal-pane"
+                [ Html.Attributes.attribute "term-id" termId
+                , Html.Attributes.attribute "cwd" (Maybe.withDefault "" model.vaultRoot)
+                , Html.Attributes.attribute "init-cmd" initCmd
+                , style "display" "block"
+                , style "width" "100%"
+                , style "height" "100%"
+                ]
+                []
 
 
 scratchPane : Model -> Html Msg
