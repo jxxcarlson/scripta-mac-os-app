@@ -46,4 +46,12 @@ suite =
             \_ -> Expect.equal [ "Inbox" ] (PathUtil.ancestorDirs "Inbox/foo.md")
         , test "ancestorDirs of a root-level file is empty" <|
             \_ -> Expect.equal [] (PathUtil.ancestorDirs "foo.md")
+        , test "withDefaultExtension appends when there is no extension" <|
+            \_ -> Expect.equal "notes.md" (PathUtil.withDefaultExtension "md" "notes")
+        , test "withDefaultExtension keeps an existing extension" <|
+            \_ -> Expect.equal "notes.scripta" (PathUtil.withDefaultExtension "md" "notes.scripta")
+        , test "withDefaultExtension keeps a multi-dot name unchanged" <|
+            \_ -> Expect.equal "a.b.md" (PathUtil.withDefaultExtension "md" "a.b.md")
+        , test "withDefaultExtension only inspects the basename" <|
+            \_ -> Expect.equal "Inbox/notes.md" (PathUtil.withDefaultExtension "md" "Inbox/notes")
         ]

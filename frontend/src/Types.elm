@@ -17,6 +17,7 @@ type alias Model =
     , tree : List Node
     , selectedPath : Maybe String
     , history : List String
+    , future : List String
     , nextRequestId : Int
     , pending : Dict Int PendingOp
     , error : Maybe String
@@ -46,6 +47,7 @@ type alias Model =
     , chatMessages : List Chat.ChatMessage
     , chatInput : String
     , chatPending : Bool
+    , chatFileTitles : Dict Int String
     }
 
 
@@ -106,7 +108,8 @@ type Msg
     | ToggledReaderMode
     | ToggledParseMode
     | ToggledTheme
-    | ClickedBack
+    | ClickedPrev
+    | ClickedNext
     | ToggledSettings
     | SetActiveProvider String
     | SetProviderModel String String
@@ -119,3 +122,5 @@ type Msg
     | ClickedReload
     | ChatInput String
     | SendChat
+    | ChatFileTitleInput Int String
+    | ClickedChatFile Int String

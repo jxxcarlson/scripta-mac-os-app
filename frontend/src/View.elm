@@ -89,10 +89,15 @@ view model =
                 , style "flex-wrap" "wrap"
                 ]
                 [ button
-                    [ onClick ClickedBack
+                    [ onClick ClickedPrev
                     , Html.Attributes.disabled (List.isEmpty model.history)
                     ]
-                    [ text "\u{2190} Back" ]
+                    [ text "← Prev" ]
+                , button
+                    [ onClick ClickedNext
+                    , Html.Attributes.disabled (List.isEmpty model.future)
+                    ]
+                    [ text "Next →" ]
                 , button [ onClick ToggledReaderMode ]
                     [ text
                         (if model.readerMode then
@@ -120,8 +125,8 @@ view model =
                             "Light"
                         )
                     ]
-                , button [ onClick ToggledSettings ] [ text "\u{2699} Settings" ]
-                , button [ onClick ToggledTerminal ] [ text "\u{2318} Terminal" ]
+                , button [ onClick ToggledSettings ] [ text "⚙ Settings" ]
+                , button [ onClick ToggledTerminal ] [ text "⌘ Terminal" ]
                 , Html.input
                     [ Html.Attributes.placeholder "new-file-name"
                     , Html.Attributes.value model.newName
@@ -273,10 +278,10 @@ saveLabel status =
             "Saved"
 
         SaveState.Unsaved ->
-            "Unsaved\u{2026}"
+            "Unsaved…"
 
         SaveState.Saving ->
-            "Saving\u{2026}"
+            "Saving…"
 
 
 errorBanner : Model -> List (Html Msg)
@@ -332,7 +337,7 @@ folderIcon isOpen =
 searchBox : Model -> Html Msg
 searchBox model =
     Html.input
-        [ Html.Attributes.placeholder "Search documents\u{2026}"
+        [ Html.Attributes.placeholder "Search documents…"
         , Html.Attributes.value model.searchQuery
         , onInput SetSearchQuery
         , style "width" "100%"
@@ -447,7 +452,8 @@ nodeView forceOpen highlights openFolders node =
                 )
 
 
-{-| Preview for a non-renderable text document: show its source verbatim. -}
+{-| Preview for a non-renderable text document: show its source verbatim.
+-}
 plainTextPreview : String -> Html msg
 plainTextPreview content =
     Html.pre
@@ -458,7 +464,8 @@ plainTextPreview content =
         [ Html.text content ]
 
 
-{-| The image element for an opened image document (empty src until loaded). -}
+{-| The image element for an opened image document (empty src until loaded).
+-}
 imagePane : Maybe String -> Html msg
 imagePane imageSrc =
     Html.img
@@ -469,7 +476,8 @@ imagePane imageSrc =
         []
 
 
-{-| Full-width view for image documents: tree column + image pane. -}
+{-| Full-width view for image documents: tree column + image pane.
+-}
 imageView : Model -> Html Msg
 imageView model =
     div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
@@ -663,9 +671,11 @@ aiChatView model =
     in
     div [ style "display" "flex", style "flex-direction" "column", style "height" "100%", style "min-height" "0" ]
         [ div [ style "flex" "1", style "overflow" "auto", style "padding" "12px" ]
-            (List.map chatMessageView model.chatMessages
+            (List.indexedMap
+                (\i m -> chatMessageView i (Dict.get i model.chatFileTitles |> Maybe.withDefault "") m)
+                model.chatMessages
                 ++ (if model.chatPending then
-                        [ div [ style "color" "var(--muted)", style "font-style" "italic", style "padding" "4px 0" ] [ text "thinking\u{2026}" ] ]
+                        [ div [ style "color" "var(--muted)", style "font-style" "italic", style "padding" "4px 0" ] [ text "thinking…" ] ]
 
                     else
                         []
@@ -676,12 +686,12 @@ aiChatView model =
 
           else
             div [ style "padding" "12px", style "color" "var(--muted)", style "border-top" "1px solid var(--border)" ]
-                [ text ("Set an API key for " ++ AiConfig.providerLabel provider ++ " in \u{2699} Settings to use chat.") ]
+                [ text ("Set an API key for " ++ AiConfig.providerLabel provider ++ " in ⚙ Settings to use chat.") ]
         ]
 
 
-chatMessageView : Chat.ChatMessage -> Html Msg
-chatMessageView m =
+chatMessageView : Int -> String -> Chat.ChatMessage -> Html Msg
+chatMessageView idx titleDraft m =
     let
         isUser =
             m.role == "user"
@@ -732,6 +742,22 @@ chatMessageView m =
                             , style "padding" "0 6px"
                             ]
                             [ text "Copy" ]
+                        , Html.input
+                            [ Html.Attributes.placeholder "title…"
+                            , Html.Attributes.value titleDraft
+                            , onInput (ChatFileTitleInput idx)
+                            , style "font-size" "10px"
+                            , style "width" "90px"
+                            ]
+                            []
+                        , button
+                            [ onClick (ClickedChatFile idx m.content)
+                            , Html.Attributes.disabled (String.isEmpty (String.trim titleDraft))
+                            , style "font-size" "10px"
+                            , style "font-weight" "400"
+                            , style "padding" "0 6px"
+                            ]
+                            [ text "File" ]
                         ]
                    )
             )
@@ -743,7 +769,7 @@ chatInputRow : Model -> Html Msg
 chatInputRow model =
     div [ style "display" "flex", style "gap" "8px", style "padding" "8px", style "border-top" "1px solid var(--border)", style "align-items" "flex-end" ]
         [ Html.textarea
-            [ Html.Attributes.placeholder "Message the AI\u{2026}"
+            [ Html.Attributes.placeholder "Message the AI…"
             , Html.Attributes.value model.chatInput
             , onInput ChatInput
             , Html.Events.preventDefaultOn "keydown" chatKeydownDecoder
@@ -854,7 +880,7 @@ providerRow model provider =
                 Just hint ->
                     span [ style "display" "flex", style "align-items" "center", style "gap" "8px" ]
                         [ span [ style "color" "var(--muted)", style "font-family" "ui-monospace, monospace", style "font-size" "12px" ]
-                            [ text ("key: \u{2022}\u{2022}\u{2022}\u{2022}" ++ hint) ]
+                            [ text ("key: ••••" ++ hint) ]
                         , button [ onClick (DeleteApiKey provider) ] [ text "Delete" ]
                         ]
 

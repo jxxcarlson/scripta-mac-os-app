@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import AiConfig
 import Browser
+import Browser.Events
 import Chat
 import Dict
 import Export
@@ -10,6 +11,7 @@ import Flags
 import Json.Decode as D
 import Json.Encode as E
 import Language
+import Nav
 import OpenFolders
 import Process
 import Render
@@ -46,6 +48,7 @@ init flagsValue =
         , tree = []
         , selectedPath = Nothing
         , history = []
+        , future = []
         , nextRequestId = 0
         , pending = Dict.empty
         , error = Nothing
@@ -75,6 +78,7 @@ init flagsValue =
         , chatMessages = []
         , chatInput = ""
         , chatPending = False
+        , chatFileTitles = Dict.empty
         }
 
 
@@ -102,6 +106,7 @@ openVault root model =
                 | vaultRoot = Just root
                 , selectedPath = Nothing
                 , history = []
+                , future = []
                 , content = ""
                 , loadedContent = ""
                 , parsedDoc = Nothing
@@ -142,7 +147,7 @@ openExternalFile abs model =
 
 
 {-| Open a vault-relative document path in-app, pushing the current document
-onto the history stack (for Back).
+onto the history stack (for Prev/Next).
 -}
 openDoc : String -> Model -> ( Model, Cmd Msg )
 openDoc path model =
@@ -155,10 +160,10 @@ openDoc path model =
                 Nothing ->
                     model.history
     in
-    openDocNoPush path { model | history = history }
+    openDocNoPush path { model | history = history, future = [] }
 
 
-{-| Open a vault-relative document path without touching history (used by Back). -}
+{-| Open a vault-relative document path without touching history (used by Prev/Next). -}
 openDocNoPush : String -> Model -> ( Model, Cmd Msg )
 openDocNoPush path model =
     case model.vaultRoot of
@@ -498,6 +503,51 @@ update msg model =
         CopyReply text ->
             ( model, FileOps.copyToClipboard text )
 
+        ChatFileTitleInput n s ->
+            ( { model | chatFileTitles = Dict.insert n s model.chatFileTitles }, Cmd.none )
+
+        ClickedChatFile n content ->
+            case model.vaultRoot of
+                Just root ->
+                    let
+                        title =
+                            String.trim (Dict.get n model.chatFileTitles |> Maybe.withDefault "")
+                    in
+                    if String.isEmpty title then
+                        ( model, Cmd.none )
+
+                    else
+                        let
+                            name =
+                                PathUtil.withDefaultExtension "md" title
+
+                            cleared =
+                                { model | chatFileTitles = Dict.remove n model.chatFileTitles }
+                        in
+                        case PathUtil.kbaseRoot root of
+                            Just kroot ->
+                                let
+                                    path =
+                                        "Inbox/" ++ name
+                                in
+                                request (PCreateFile path)
+                                    "create_file"
+                                    [ ( "root", E.string kroot ), ( "path", E.string path ), ( "content", E.string content ) ]
+                                    cleared
+
+                            Nothing ->
+                                let
+                                    path =
+                                        PathUtil.siblingPath model.selectedPath name
+                                in
+                                request (PCreateFile path)
+                                    "create_file"
+                                    [ ( "root", E.string root ), ( "path", E.string path ), ( "content", E.string content ) ]
+                                    cleared
+
+                Nothing ->
+                    ( model, Cmd.none )
+
         ClickedReload ->
             relist model
 
@@ -541,12 +591,20 @@ update msg model =
                 [ ( "provider", E.string provider ) ]
                 model
 
-        ClickedBack ->
-            case model.history of
-                prev :: rest ->
-                    openDocNoPush prev { model | history = rest }
+        ClickedPrev ->
+            case Nav.prev model.selectedPath model.history model.future of
+                Just step ->
+                    openDocNoPush step.target { model | history = step.history, future = step.future }
 
-                [] ->
+                Nothing ->
+                    ( model, Cmd.none )
+
+        ClickedNext ->
+            case Nav.next model.selectedPath model.history model.future of
+                Just step ->
+                    openDocNoPush step.target { model | history = step.history, future = step.future }
+
+                Nothing ->
                     ( model, Cmd.none )
 
         ToggledParseMode ->
@@ -797,7 +855,28 @@ subscriptions _ =
         , FileOps.fileChanged GotFileChanged
         , FileOps.openFile GotOpenFile
         , FileOps.gotOpenFolders GotOpenFolders
+        , Browser.Events.onKeyDown navKeyDecoder
         ]
+
+
+{-| Cmd+[ -> Prev, Cmd+] -> Next. Fails (no message) for anything else, so it
+does not interfere with normal typing. The update handlers no-op when the
+relevant nav stack is empty.
+-}
+navKeyDecoder : D.Decoder Msg
+navKeyDecoder =
+    D.map2 Tuple.pair (D.field "metaKey" D.bool) (D.field "key" D.string)
+        |> D.andThen
+            (\( meta, key ) ->
+                if meta && key == "[" then
+                    D.succeed ClickedPrev
+
+                else if meta && key == "]" then
+                    D.succeed ClickedNext
+
+                else
+                    D.fail "not a nav shortcut"
+            )
 
 
 relist : Model -> ( Model, Cmd Msg )
