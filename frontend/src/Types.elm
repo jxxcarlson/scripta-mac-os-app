@@ -35,6 +35,8 @@ type alias Model =
     , openFolders : Set String
     , searchQuery : String
     , readerMode : Bool
+    , treeVisible : Bool
+    , tocVisible : Bool
     , fullParse : Bool
     , initialLastVault : Maybe String
     , aiConfig : AiConfig.AiConfig
@@ -112,6 +114,8 @@ type Msg
     | ClickedPrev
     | ClickedNext
     | ToggledSettings
+    | ToggledTree
+    | ToggledToc
     | SetActiveProvider String
     | SetProviderModel String String
     | SetAgentCommand String

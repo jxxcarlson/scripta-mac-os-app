@@ -56,32 +56,27 @@ view model =
     let
         threePaneRow =
             div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
-                [ treeColumn model
-                , Html.node "codemirror-editor"
-                    [ Html.Attributes.attribute "text" model.loadedContent
-                    , Html.Attributes.attribute "fill-parent" ""
-                    , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
-                    , style "flex" "0 0 auto"
-                    , style "width" "var(--editor-split, 50%)"
-                    , style "border-right" "1px solid var(--border)"
-                    ]
-                    []
-                , div
-                    [ Html.Attributes.id "editor-split-handle"
-                    , style "flex" "0 0 auto"
-                    , style "width" "6px"
-                    , style "cursor" "col-resize"
-                    , style "background" "var(--border)"
-                    ]
-                    []
-                , div
-                    [ Html.Attributes.id Editor.renderedTextId
-                    , style "flex" "1"
-                    , style "padding" "16px"
-                    , style "overflow" "auto"
-                    ]
-                    (previewBody model)
-                ]
+                (treeCols model
+                    ++ [ Html.node "codemirror-editor"
+                            [ Html.Attributes.attribute "text" model.loadedContent
+                            , Html.Attributes.attribute "fill-parent" ""
+                            , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
+                            , style "flex" "0 0 auto"
+                            , style "width" "var(--editor-split, 50%)"
+                            , style "border-right" "1px solid var(--border)"
+                            ]
+                            []
+                       , div
+                            [ Html.Attributes.id "editor-split-handle"
+                            , style "flex" "0 0 auto"
+                            , style "width" "6px"
+                            , style "cursor" "col-resize"
+                            , style "background" "var(--border)"
+                            ]
+                            []
+                       ]
+                    ++ renderTocColumns model
+                )
 
         toolbar =
             div
@@ -129,6 +124,24 @@ view model =
                             "Light"
                         )
                     ]
+                , button [ onClick ToggledTree ]
+                    [ text
+                        (if model.treeVisible then
+                            "Hide Tree"
+
+                         else
+                            "Show Tree"
+                        )
+                    ]
+                , button [ onClick ToggledToc ]
+                    [ text
+                        (if model.tocVisible then
+                            "Hide TOC"
+
+                         else
+                            "Show TOC"
+                        )
+                    ]
                 , button [ onClick ToggledSettings ] [ text "⚙ Settings" ]
                 , button [ onClick ToggledTerminal ] [ text "⌘ Terminal" ]
                 , Html.input
@@ -152,80 +165,8 @@ view model =
                 ]
 
         readerView =
-            let
-                ( bodyContent, tocCols ) =
-                    case ( model.language, model.parsedDoc ) of
-                        ( Just Language.Scripta, Just doc ) ->
-                            let
-                                out =
-                                    Render.renderDocument model.isLight model.contentWidth doc
-
-                                bodyHtml =
-                                    (out.title :: out.body)
-                                        |> List.map (Html.map (\_ -> NoOpFromRender))
-
-                                tocCol =
-                                    if List.isEmpty out.toc then
-                                        []
-
-                                    else
-                                        [ div
-                                            [ style "width" "220px"
-                                            , style "flex" "0 0 auto"
-                                            , style "border-left" "1px solid var(--border)"
-                                            , style "padding" "16px"
-                                            , style "overflow" "auto"
-                                            ]
-                                            (List.map (Html.map GotRenderMsg) out.toc)
-                                        ]
-                            in
-                            ( bodyHtml, tocCol )
-
-                        ( Just Language.Markdown, _ ) ->
-                            let
-                                out =
-                                    MarkdownRender.render model.content
-
-                                bodyHtml =
-                                    out.body
-                                        |> List.map (Html.map GotRenderMsg)
-
-                                tocCol =
-                                    if List.isEmpty out.toc then
-                                        []
-
-                                    else
-                                        [ div
-                                            [ style "width" "220px"
-                                            , style "flex" "0 0 auto"
-                                            , style "border-left" "1px solid var(--border)"
-                                            , style "padding" "16px"
-                                            , style "overflow" "auto"
-                                            ]
-                                            (List.map (Html.map GotRenderMsg) out.toc)
-                                        ]
-                            in
-                            ( bodyHtml, tocCol )
-
-                        _ ->
-                            ( previewBody model, [] )
-            in
             div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
-                ([ treeColumn model
-                 , div
-                    [ style "flex" "1"
-                    , style "padding" "16px"
-                    , style "overflow" "auto"
-                    ]
-                    [ div
-                        [ Html.Attributes.id Editor.renderedTextId
-                        , style "max-width" "5.5in"
-                        ]
-                        bodyContent
-                    ]
-                 ]
-                    ++ tocCols
-                )
+                (treeCols model ++ renderTocColumns model)
 
         body =
             if model.language == Just Language.Image then
@@ -543,10 +484,96 @@ imagePane imageSrc =
 imageView : Model -> Html Msg
 imageView model =
     div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
-        [ treeColumn model
-        , div [ style "flex" "1", style "padding" "16px", style "overflow" "auto" ]
-            [ imagePane model.imageSrc ]
-        ]
+        (treeCols model
+            ++ [ div [ style "flex" "1", style "padding" "16px", style "overflow" "auto" ]
+                    [ imagePane model.imageSrc ]
+               ]
+        )
+
+
+treeCols : Model -> List (Html Msg)
+treeCols model =
+    if model.treeVisible then
+        [ treeColumn model ]
+
+    else
+        []
+
+
+{-| The rendered body and the TOC for the current document. -}
+renderedAndToc : Model -> ( List (Html Msg), List (Html Msg) )
+renderedAndToc model =
+    case ( model.language, model.parsedDoc ) of
+        ( Just Language.Scripta, Just doc ) ->
+            let
+                out =
+                    Render.renderDocument model.isLight model.contentWidth doc
+            in
+            ( (out.title :: out.body) |> List.map (Html.map (\_ -> NoOpFromRender))
+            , out.toc |> List.map (Html.map GotRenderMsg)
+            )
+
+        ( Just Language.Markdown, _ ) ->
+            let
+                out =
+                    MarkdownRender.render model.content
+            in
+            ( out.body |> List.map (Html.map GotRenderMsg)
+            , out.toc |> List.map (Html.map GotRenderMsg)
+            )
+
+        _ ->
+            ( previewBody model, [] )
+
+
+{-| The rendered-text column, plus a draggable divider and the TOC column when
+the TOC is shown. The render column keeps id=renderedTextId wrapping the body. -}
+renderTocColumns : Model -> List (Html Msg)
+renderTocColumns model =
+    let
+        ( bodyHtml, tocHtml ) =
+            renderedAndToc model
+
+        showToc =
+            model.tocVisible && not (List.isEmpty tocHtml)
+
+        renderColumn =
+            div
+                ([ Html.Attributes.id Editor.renderedTextId
+                 , style "padding" "16px"
+                 , style "overflow" "auto"
+                 ]
+                    ++ (if showToc then
+                            [ style "flex" "0 0 auto", style "width" "var(--render-toc-split, 540px)" ]
+
+                        else
+                            [ style "flex" "1" ]
+                       )
+                )
+                [ div [ style "max-width" "5.5in" ] bodyHtml ]
+    in
+    renderColumn
+        :: (if showToc then
+                [ div
+                    [ Html.Attributes.id "toc-split-handle"
+                    , style "flex" "0 0 auto"
+                    , style "width" "6px"
+                    , style "cursor" "col-resize"
+                    , style "background" "var(--border)"
+                    ]
+                    []
+                , div
+                    [ style "flex" "1"
+                    , style "border-left" "1px solid var(--border)"
+                    , style "padding" "16px"
+                    , style "overflow" "auto"
+                    ]
+                    tocHtml
+                ]
+
+            else
+                []
+           )
 
 
 previewBody : Model -> List (Html Msg)
