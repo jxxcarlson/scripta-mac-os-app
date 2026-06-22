@@ -239,7 +239,7 @@
           if (this._term) return;
           const id = this.getAttribute('term-id');
           const cwd = this.getAttribute('cwd') || '';
-          const term = new Terminal({ convertEol: false, fontFamily: 'ui-monospace, monospace', fontSize: 13 });
+          const term = new Terminal({ convertEol: false, fontFamily: 'ui-monospace, monospace', fontSize: 13, theme: { background: '#333333' } });
           const fit = new FitAddon.FitAddon();
           term.loadAddon(fit);
           term.open(this);
