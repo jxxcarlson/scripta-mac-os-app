@@ -749,7 +749,7 @@ chatMessageView idx titleDraft m =
         , style "border-radius" "6px"
         , style "background"
             (if isUser then
-                "var(--tree-selected-bg)"
+                "var(--chat-prompt-bg)"
 
              else
                 "var(--panel-bg)"
