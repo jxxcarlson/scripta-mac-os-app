@@ -334,6 +334,26 @@ folderIcon isOpen =
         ]
 
 
+{-| A small solid file glyph (filled dark blue), sized to match folderIcon. -}
+fileIcon : Html msg
+fileIcon =
+    Svg.svg
+        [ SA.width "13"
+        , SA.height "13"
+        , SA.viewBox "0 0 16 16"
+        , SA.style "vertical-align: middle; margin-right: 5px;"
+        ]
+        [ Svg.path
+            [ SA.d "M3 1.5 H9 L13 5.5 V14.5 H3 Z M9 1.5 V5.5 H13"
+            , SA.fill "#3b6ea5"
+            , SA.stroke "#3b6ea5"
+            , SA.strokeWidth "1"
+            , SA.strokeLinejoin "round"
+            ]
+            []
+        ]
+
+
 searchBox : Model -> Html Msg
 searchBox model =
     Html.input
@@ -413,7 +433,7 @@ nodeView forceOpen highlights openFolders node =
                             []
                        )
                 )
-                [ span [ style "flex" "0 0 auto", style "margin-right" "5px" ] [ text "-" ]
+                [ span [ style "flex" "0 0 auto", style "margin-right" "5px" ] [ fileIcon ]
                 , span [ style "flex" "1 1 auto" ] [ text r.name ]
                 ]
 
