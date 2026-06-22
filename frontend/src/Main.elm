@@ -10,6 +10,7 @@ import Flags
 import Json.Decode as D
 import Json.Encode as E
 import Language
+import Nav
 import OpenFolders
 import Process
 import Render
@@ -46,6 +47,7 @@ init flagsValue =
         , tree = []
         , selectedPath = Nothing
         , history = []
+        , future = []
         , nextRequestId = 0
         , pending = Dict.empty
         , error = Nothing
@@ -103,6 +105,7 @@ openVault root model =
                 | vaultRoot = Just root
                 , selectedPath = Nothing
                 , history = []
+                , future = []
                 , content = ""
                 , loadedContent = ""
                 , parsedDoc = Nothing
@@ -156,7 +159,7 @@ openDoc path model =
                 Nothing ->
                     model.history
     in
-    openDocNoPush path { model | history = history }
+    openDocNoPush path { model | history = history, future = [] }
 
 
 {-| Open a vault-relative document path without touching history (used by Back). -}
@@ -587,12 +590,20 @@ update msg model =
                 [ ( "provider", E.string provider ) ]
                 model
 
-        ClickedBack ->
-            case model.history of
-                prev :: rest ->
-                    openDocNoPush prev { model | history = rest }
+        ClickedPrev ->
+            case Nav.prev model.selectedPath model.history model.future of
+                Just step ->
+                    openDocNoPush step.target { model | history = step.history, future = step.future }
 
-                [] ->
+                Nothing ->
+                    ( model, Cmd.none )
+
+        ClickedNext ->
+            case Nav.next model.selectedPath model.history model.future of
+                Just step ->
+                    openDocNoPush step.target { model | history = step.history, future = step.future }
+
+                Nothing ->
                     ( model, Cmd.none )
 
         ToggledParseMode ->

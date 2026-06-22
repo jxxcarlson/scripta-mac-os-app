@@ -17,6 +17,7 @@ type alias Model =
     , tree : List Node
     , selectedPath : Maybe String
     , history : List String
+    , future : List String
     , nextRequestId : Int
     , pending : Dict Int PendingOp
     , error : Maybe String
@@ -107,7 +108,8 @@ type Msg
     | ToggledReaderMode
     | ToggledParseMode
     | ToggledTheme
-    | ClickedBack
+    | ClickedPrev
+    | ClickedNext
     | ToggledSettings
     | SetActiveProvider String
     | SetProviderModel String String

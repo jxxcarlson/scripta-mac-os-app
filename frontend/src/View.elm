@@ -89,10 +89,15 @@ view model =
                 , style "flex-wrap" "wrap"
                 ]
                 [ button
-                    [ onClick ClickedBack
+                    [ onClick ClickedPrev
                     , Html.Attributes.disabled (List.isEmpty model.history)
                     ]
-                    [ text "\u{2190} Back" ]
+                    [ text "\u{2190} Prev" ]
+                , button
+                    [ onClick ClickedNext
+                    , Html.Attributes.disabled (List.isEmpty model.future)
+                    ]
+                    [ text "Next \u{2192}" ]
                 , button [ onClick ToggledReaderMode ]
                     [ text
                         (if model.readerMode then
