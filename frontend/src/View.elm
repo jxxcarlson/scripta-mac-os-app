@@ -35,11 +35,6 @@ treeColumn model =
             ]
             :: [ searchBox model
                , fileTree model
-               , div [ style "margin-top" "4px", style "display" "flex", style "gap" "2mm" ]
-                    [ button [ onClick ClickedExportHtml ] [ text "Export HTML" ]
-                    , button [ onClick ClickedExportLatex ] [ text "Export LaTeX" ]
-                    , button [ onClick ClickedExportPdf ] [ text "Export PDF" ]
-                    ]
                ]
         )
 
@@ -66,8 +61,17 @@ view model =
                     [ Html.Attributes.attribute "text" model.loadedContent
                     , Html.Attributes.attribute "fill-parent" ""
                     , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
-                    , style "flex" "1"
+                    , style "flex" "0 0 auto"
+                    , style "width" "var(--editor-split, 50%)"
                     , style "border-right" "1px solid var(--border)"
+                    ]
+                    []
+                , div
+                    [ Html.Attributes.id "editor-split-handle"
+                    , style "flex" "0 0 auto"
+                    , style "width" "6px"
+                    , style "cursor" "col-resize"
+                    , style "background" "var(--border)"
                     ]
                     []
                 , div
@@ -137,11 +141,12 @@ view model =
                     , Html.Attributes.spellcheck False
                     ]
                     []
+                , div [ style "font-size" "12px", style "color" "var(--muted)" ]
+                    [ text (saveLabel model.saveState.saveStatus) ]
                 , button [ onClick ClickedNewFile ] [ text "New" ]
                 , button [ onClick ClickedRename ] [ text "Rename" ]
                 , button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
-                , div [ style "font-size" "12px", style "color" "var(--muted)" ]
-                    [ text (saveLabel model.saveState.saveStatus) ]
+                , exportDropdown
                 ]
 
         readerView =
@@ -368,6 +373,19 @@ searchBox model =
         []
 
 
+exportDropdown : Html Msg
+exportDropdown =
+    Html.select
+        [ Html.Attributes.value ""
+        , Html.Events.on "change" (D.map ExportSelected Html.Events.targetValue)
+        ]
+        [ Html.option [ Html.Attributes.value "" ] [ text "Export" ]
+        , Html.option [ Html.Attributes.value "html" ] [ text "Export HTML" ]
+        , Html.option [ Html.Attributes.value "latex" ] [ text "Export LaTeX" ]
+        , Html.option [ Html.Attributes.value "pdf" ] [ text "Export PDF" ]
+        ]
+
+
 {-| Tree highlight inputs: the open document (pale-blue pill) and the folder a
 new document will land in (lighter-blue fill). `currentFolder` is "" at the
 vault root, which matches no folder node.
@@ -441,6 +459,26 @@ nodeView forceOpen highlights openFolders node =
             let
                 isOpen =
                     forceOpen || Set.member r.path openFolders
+
+                ( maybeIndex, restChildren ) =
+                    Workspace.splitIndexFile r.children
+
+                indexLink =
+                    case maybeIndex of
+                        Just (FileNode ir) ->
+                            [ span
+                                [ Html.Events.stopPropagationOn "click" (D.succeed ( ClickedTreeNode ir.path, True ))
+                                , style "flex" "0 0 auto"
+                                , style "margin-left" "6px"
+                                , style "color" "var(--muted)"
+                                , style "cursor" "pointer"
+                                , style "font-size" "12px"
+                                ]
+                                [ text "_index.md" ]
+                            ]
+
+                        _ ->
+                            []
             in
             li []
                 (div
@@ -460,11 +498,13 @@ nodeView forceOpen highlights openFolders node =
                                 []
                            )
                     )
-                    [ span [ style "flex" "0 0 auto", style "margin-right" "5px" ] [ folderIcon isOpen ]
-                    , span [ style "flex" "1 1 auto" ] [ text r.name ]
-                    ]
+                    ([ span [ style "flex" "0 0 auto", style "margin-right" "5px" ] [ folderIcon isOpen ]
+                     , span [ style "flex" "1 1 auto" ] [ text r.name ]
+                     ]
+                        ++ indexLink
+                    )
                     :: (if isOpen then
-                            [ treeView forceOpen highlights openFolders r.children ]
+                            [ treeView forceOpen highlights openFolders restChildren ]
 
                         else
                             []
@@ -749,7 +789,7 @@ chatMessageView idx titleDraft m =
         , style "border-radius" "6px"
         , style "background"
             (if isUser then
-                "var(--tree-selected-bg)"
+                "var(--chat-prompt-bg)"
 
              else
                 "var(--panel-bg)"

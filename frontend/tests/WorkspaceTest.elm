@@ -54,4 +54,37 @@ suite =
 
                     Err e ->
                         Expect.fail (D.errorToString e)
+        , test "splitIndexFile extracts the _index.md file and removes it from the list" <|
+            \_ ->
+                let
+                    idx =
+                        FileNode { path = "Physics/_index.md", name = "_index.md", mtime = 1 }
+
+                    a =
+                        FileNode { path = "Physics/a.scripta", name = "a.scripta", mtime = 2 }
+
+                    b =
+                        FileNode { path = "Physics/b.scripta", name = "b.scripta", mtime = 3 }
+                in
+                Expect.equal ( Just idx, [ a, b ] ) (Workspace.splitIndexFile [ a, idx, b ])
+        , test "splitIndexFile returns Nothing and the list unchanged when there is no _index.md" <|
+            \_ ->
+                let
+                    a =
+                        FileNode { path = "Physics/a.scripta", name = "a.scripta", mtime = 2 }
+
+                    b =
+                        FileNode { path = "Physics/b.scripta", name = "b.scripta", mtime = 3 }
+                in
+                Expect.equal ( Nothing, [ a, b ] ) (Workspace.splitIndexFile [ a, b ])
+        , test "splitIndexFile ignores a folder named _index.md (must be a file)" <|
+            \_ ->
+                let
+                    folder =
+                        FolderNode { path = "Physics/_index.md", name = "_index.md", children = [] }
+
+                    a =
+                        FileNode { path = "Physics/a.scripta", name = "a.scripta", mtime = 2 }
+                in
+                Expect.equal ( Nothing, [ folder, a ] ) (Workspace.splitIndexFile [ folder, a ])
         ]
