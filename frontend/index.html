@@ -131,7 +131,11 @@
         transition: background 0.08s ease, transform 0.05s ease;
       }
       button:hover, .cm-button:hover { background: #3a3c55; }
-      button:active, .cm-button:active { background: #1f2030 !important; transform: translateY(1px); }
+      @keyframes btn-flash {
+        0%   { background: #1f2030; transform: translateY(1px); }
+        100% { background: #2b2c40; transform: translateY(0); }
+      }
+      button:active, .cm-button:active { animation: btn-flash 0.12s ease; }
 
       .lr-sync-highlight {
         background-color: #cfe6fb;
