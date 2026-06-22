@@ -1,4 +1,4 @@
-module PathUtil exposing (ancestorDirs, basename, kbaseRoot, parentDir, siblingPath)
+module PathUtil exposing (ancestorDirs, basename, kbaseRoot, parentDir, siblingPath, withDefaultExtension)
 
 {-| Small '/'-separated path helpers shared by the file-open logic.
 -}
@@ -88,3 +88,17 @@ siblingPath reference fileName =
 
                 dir ->
                     dir ++ "/" ++ fileName
+
+
+{-| Ensure a file name has an extension. If the basename (final '/'-segment)
+already contains a '.', `name` is returned unchanged; otherwise "." ++ ext is
+appended. So `withDefaultExtension "md" "notes"` is `"notes.md"`, while
+`withDefaultExtension "md" "notes.scripta"` is `"notes.scripta"`.
+-}
+withDefaultExtension : String -> String -> String
+withDefaultExtension ext name =
+    if String.contains "." (basename name) then
+        name
+
+    else
+        name ++ "." ++ ext
