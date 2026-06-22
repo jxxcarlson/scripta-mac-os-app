@@ -1,4 +1,4 @@
-.PHONY: elm dev build test test-elm test-rust icon
+.PHONY: elm dev build install test test-elm test-rust icon
 
 elm:
 	cd frontend && elm make src/Main.elm --output=dist/elm.js
@@ -8,6 +8,17 @@ dev: elm
 
 build:
 	npx tauri build
+
+# Build the release app and install it into /Applications, replacing any
+# existing copy. `make build` only writes to src-tauri/target/release/bundle;
+# this is what makes a double-clicked /Applications/Scripta.app reflect new code.
+# Quits a running instance first so the bundle can be replaced cleanly.
+install: build
+	@osascript -e 'tell application "Scripta" to quit' 2>/dev/null || true
+	@sleep 1
+	@rm -rf "/Applications/Scripta.app"
+	@ditto "src-tauri/target/release/bundle/macos/Scripta.app" "/Applications/Scripta.app"
+	@echo "Installed Scripta.app -> /Applications"
 
 test: test-elm test-rust
 
