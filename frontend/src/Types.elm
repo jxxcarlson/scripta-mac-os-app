@@ -1,4 +1,4 @@
-module Types exposing (Model, Msg(..), PendingOp(..), Pane(..))
+module Types exposing (Model, Msg(..), Pane(..), PendingOp(..), ViewMode(..), viewModeFromString)
 
 import AiConfig
 import Chat
@@ -74,6 +74,25 @@ type PendingOp
     | PSetApiKey String String
     | PDeleteApiKey String
     | PChatReply
+
+
+type ViewMode
+    = ViewReader
+    | ViewEditor
+    | ViewBoth
+
+
+viewModeFromString : String -> ViewMode
+viewModeFromString s =
+    case s of
+        "reader" ->
+            ViewReader
+
+        "editor" ->
+            ViewEditor
+
+        _ ->
+            ViewBoth
 
 
 type Pane
