@@ -66,6 +66,8 @@ init flagsValue =
         , openFolders = Set.empty
         , searchQuery = ""
         , readerMode = flags.readerMode
+        , treeVisible = True
+        , tocVisible = False
         , fullParse = flags.fullParse
         , initialLastVault = flags.lastVault
         , aiConfig = flags.aiConfig
@@ -564,6 +566,12 @@ update msg model =
 
         ClickedReload ->
             relist model
+
+        ToggledTree ->
+            ( { model | treeVisible = not model.treeVisible }, Cmd.none )
+
+        ToggledToc ->
+            ( { model | tocVisible = not model.tocVisible }, Cmd.none )
 
         ToggledSettings ->
             ( { model | showSettings = not model.showSettings }, Cmd.none )

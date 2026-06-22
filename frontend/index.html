@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Scripta</title>
+    <title>kbase</title>
 
     <!-- Vendored KaTeX (offline) -->
     <link rel="stylesheet" href="vendor/katex/katex.min.css" />
@@ -27,9 +27,9 @@
          Without these, selection / sync-highlight / search-match backgrounds are
          transparent — i.e. selection looks broken. Light-theme values: */
       :root {
-        --app-bg: #ffffff;
+        --app-bg: #eeeeee;
         --app-fg: #1a1a1a;
-        --panel-bg: #ffffff;
+        --panel-bg: #eeeeee;
         --border: #dddddd;
         --muted: #666666;
         --link: #2563eb;
@@ -40,10 +40,10 @@
         --error-border: #cc9999;
         --tree-selected-bg: #cfe6fb;
         --tree-folder-bg: #e8f2fc;
-        --chat-prompt-bg: #eeeeee;
+        --chat-prompt-bg: #e0e0e0;
 
         --cm-fg: #1a1a1a;
-        --cm-bg: #ffffff;
+        --cm-bg: #eeeeee;
         --cm-selection-bg: #b3d4fc;
         --cm-selection-match-bg: #d7ecff;
         --cm-sync-highlight-bg: #fff2a8;
@@ -58,7 +58,7 @@
         --cm-gutter-fg: #999999;
         --cm-active-line-gutter-bg: #ececec;
         --cm-fold-placeholder: #888888;
-        --cm-tooltip-bg: #ffffff;
+        --cm-tooltip-bg: #eeeeee;
         --cm-syntax-arg: #6a737d;
         --cm-syntax-block-name: #22863a;
         --cm-syntax-block-vert: #999999;
@@ -72,7 +72,7 @@
         --cm-syntax-property-key: #005cc5;
       }
 
-      :root { --terminal-height: 280px; --terminal-split: 50%; --editor-split: 50%; }
+      :root { --terminal-height: 280px; --terminal-split: 50%; --editor-split: 50%; --render-toc-split: 540px; }
 
       [data-theme="dark"] {
         --app-bg: #1e1e1e;
@@ -239,7 +239,7 @@
           if (this._term) return;
           const id = this.getAttribute('term-id');
           const cwd = this.getAttribute('cwd') || '';
-          const term = new Terminal({ convertEol: false, fontFamily: 'ui-monospace, monospace', fontSize: 13 });
+          const term = new Terminal({ convertEol: false, fontFamily: 'ui-monospace, monospace', fontSize: 13, theme: { background: '#333333' } });
           const fit = new FitAddon.FitAddon();
           term.loadAddon(fit);
           term.open(this);
@@ -398,6 +398,44 @@
         window.addEventListener('resize', function () {
           var s = parseInt(lsGet('editorSplit'), 10);
           if (!isNaN(s)) applyEditorSplit(s, true);
+        });
+      })();
+
+      // --- Vertical divider between the rendered text (left) and the TOC (right). ---
+      (function () {
+        var renderLeft = 0;
+        function applyRenderTocSplit(px, persist) {
+          var el = document.getElementById('__RENDERED_TEXT__');
+          var left = el ? el.getBoundingClientRect().left : 0;
+          var maxW = Math.max(300, window.innerWidth - left - 160);
+          var w = Math.max(300, Math.min(maxW, px));
+          document.documentElement.style.setProperty('--render-toc-split', w + 'px');
+          if (persist) { try { localStorage.setItem('renderTocSplit', w); } catch (e) {} }
+          return w;
+        }
+        var saved = parseInt(lsGet('renderTocSplit'), 10);
+        if (!isNaN(saved)) applyRenderTocSplit(saved, true);
+        var dragging = false;
+        document.addEventListener('pointerdown', function (e) {
+          if (e.target && e.target.id === 'toc-split-handle') {
+            var el = document.getElementById('__RENDERED_TEXT__');
+            renderLeft = el ? el.getBoundingClientRect().left : 0;
+            dragging = true;
+            e.preventDefault();
+          }
+        });
+        document.addEventListener('pointermove', function (e) {
+          if (!dragging) return;
+          applyRenderTocSplit(e.clientX - renderLeft, false);
+        });
+        document.addEventListener('pointerup', function (e) {
+          if (!dragging) return;
+          dragging = false;
+          applyRenderTocSplit(e.clientX - renderLeft, true);
+        });
+        window.addEventListener('resize', function () {
+          var s = parseInt(lsGet('renderTocSplit'), 10);
+          if (!isNaN(s)) applyRenderTocSplit(s, true);
         });
       })();
 

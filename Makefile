@@ -11,14 +11,14 @@ build:
 
 # Build the release app and install it into /Applications, replacing any
 # existing copy. `make build` only writes to src-tauri/target/release/bundle;
-# this is what makes a double-clicked /Applications/Scripta.app reflect new code.
+# this is what makes a double-clicked /Applications/kbase.app reflect new code.
 # Quits a running instance first so the bundle can be replaced cleanly.
 install: build
-	@osascript -e 'tell application "Scripta" to quit' 2>/dev/null || true
+	@osascript -e 'tell application "kbase" to quit' 2>/dev/null || true
 	@sleep 1
-	@rm -rf "/Applications/Scripta.app"
-	@ditto "src-tauri/target/release/bundle/macos/Scripta.app" "/Applications/Scripta.app"
-	@echo "Installed Scripta.app -> /Applications"
+	@rm -rf "/Applications/kbase.app"
+	@ditto "src-tauri/target/release/bundle/macos/kbase.app" "/Applications/kbase.app"
+	@echo "Installed kbase.app -> /Applications"
 
 test: test-elm test-rust
 
