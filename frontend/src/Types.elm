@@ -1,4 +1,4 @@
-module Types exposing (Model, Msg(..), PendingOp(..), Pane(..))
+module Types exposing (Model, Msg(..), Pane(..), PendingOp(..), ViewMode(..), viewModeFromString)
 
 import AiConfig
 import Chat
@@ -34,7 +34,7 @@ type alias Model =
     , newName : String
     , openFolders : Set String
     , searchQuery : String
-    , readerMode : Bool
+    , viewMode : ViewMode
     , treeVisible : Bool
     , tocVisible : Bool
     , fullParse : Bool
@@ -76,6 +76,25 @@ type PendingOp
     | PChatReply
 
 
+type ViewMode
+    = ViewReader
+    | ViewEditor
+    | ViewBoth
+
+
+viewModeFromString : String -> ViewMode
+viewModeFromString s =
+    case s of
+        "reader" ->
+            ViewReader
+
+        "editor" ->
+            ViewEditor
+
+        _ ->
+            ViewBoth
+
+
 type Pane
     = TreePane
     | EditorPane
@@ -108,7 +127,7 @@ type Msg
     | ToggledFolder String
     | GotOpenFolders D.Value
     | SetSearchQuery String
-    | ToggledReaderMode
+    | SetViewMode String
     | ToggledParseMode
     | ToggledTheme
     | ClickedPrev

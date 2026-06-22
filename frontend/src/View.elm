@@ -17,7 +17,7 @@ import SaveState
 import Set exposing (Set)
 import Svg
 import Svg.Attributes as SA
-import Types exposing (Model, Msg(..))
+import Types exposing (Model, Msg(..), ViewMode(..))
 import Workspace exposing (Node(..))
 
 
@@ -54,129 +54,97 @@ themeName isLight =
 view : Model -> Html Msg
 view model =
     let
-        threePaneRow =
-            div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
-                (treeCols model
-                    ++ [ Html.node "codemirror-editor"
-                            [ Html.Attributes.attribute "text" model.loadedContent
-                            , Html.Attributes.attribute "fill-parent" ""
-                            , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
-                            , style "flex" "0 0 auto"
-                            , style "width" "var(--editor-split, 50%)"
-                            , style "border-right" "1px solid var(--border)"
-                            ]
-                            []
-                       , div
-                            [ Html.Attributes.id "editor-split-handle"
-                            , style "flex" "0 0 auto"
-                            , style "width" "6px"
-                            , style "cursor" "col-resize"
-                            , style "background" "var(--border)"
-                            ]
-                            []
-                       ]
-                    ++ renderTocColumns model
-                )
-
         toolbar =
-            div
-                [ style "display" "flex"
-                , style "align-items" "center"
-                , style "gap" "8px"
-                , style "padding" "6px 8px"
-                , style "border-bottom" "1px solid var(--border)"
-                , style "flex-wrap" "wrap"
+            div [ style "border-bottom" "1px solid var(--border)" ]
+                [ toolbarRow
+                    [ button
+                        [ onClick ClickedPrev
+                        , Html.Attributes.disabled (List.isEmpty model.history)
+                        ]
+                        [ text "← Prev" ]
+                    , button
+                        [ onClick ClickedNext
+                        , Html.Attributes.disabled (List.isEmpty model.future)
+                        ]
+                        [ text "Next →" ]
+                    , groupSep
+                    , button [ onClick ToggledTree ]
+                        [ text
+                            (if model.treeVisible then
+                                "Hide Tree"
+
+                             else
+                                "Show Tree"
+                            )
+                        ]
+                    , viewModeDropdown model
+                    , button [ onClick ToggledToc ]
+                        [ text
+                            (if model.tocVisible then
+                                "Hide TOC"
+
+                             else
+                                "Show TOC"
+                            )
+                        ]
+                    , button [ onClick ToggledTerminal ]
+                        [ text
+                            (if model.terminalVisible then
+                                "Hide Terminal"
+
+                             else
+                                "Show Terminal"
+                            )
+                        ]
+                    ]
+                , toolbarRow
+                    [ Html.input
+                        [ Html.Attributes.placeholder "new-file-name"
+                        , Html.Attributes.value model.newName
+                        , onInput SetNewName
+                        , style "width" "300px"
+                        , style "min-width" "150px"
+                        , Html.Attributes.attribute "autocapitalize" "off"
+                        , Html.Attributes.attribute "autocorrect" "off"
+                        , Html.Attributes.attribute "autocomplete" "off"
+                        , Html.Attributes.spellcheck False
+                        ]
+                        []
+                    , div [ style "font-size" "12px", style "color" "var(--muted)" ]
+                        [ text (saveLabel model.saveState.saveStatus) ]
+                    , button [ onClick ClickedNewFile ] [ text "New" ]
+                    , button [ onClick ClickedRename ] [ text "Rename" ]
+                    , button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
+                    , exportDropdown
+                    , groupSep
+                    , button [ onClick ToggledParseMode ]
+                        [ text
+                            (if model.fullParse then
+                                "Parse: Full"
+
+                             else
+                                "Parse: Incremental"
+                            )
+                        ]
+                    , button [ onClick ToggledTheme ]
+                        [ text
+                            (if model.isLight then
+                                "Dark"
+
+                             else
+                                "Light"
+                            )
+                        ]
+                    , button [ onClick ToggledSettings ] [ text "⚙ Settings" ]
+                    ]
                 ]
-                [ button
-                    [ onClick ClickedPrev
-                    , Html.Attributes.disabled (List.isEmpty model.history)
-                    ]
-                    [ text "← Prev" ]
-                , button
-                    [ onClick ClickedNext
-                    , Html.Attributes.disabled (List.isEmpty model.future)
-                    ]
-                    [ text "Next →" ]
-                , button [ onClick ToggledReaderMode ]
-                    [ text
-                        (if model.readerMode then
-                            "Exit Reader"
-
-                         else
-                            "Reader"
-                        )
-                    ]
-                , button [ onClick ToggledParseMode ]
-                    [ text
-                        (if model.fullParse then
-                            "Parse: Full"
-
-                         else
-                            "Parse: Incremental"
-                        )
-                    ]
-                , button [ onClick ToggledTheme ]
-                    [ text
-                        (if model.isLight then
-                            "Dark"
-
-                         else
-                            "Light"
-                        )
-                    ]
-                , button [ onClick ToggledTree ]
-                    [ text
-                        (if model.treeVisible then
-                            "Hide Tree"
-
-                         else
-                            "Show Tree"
-                        )
-                    ]
-                , button [ onClick ToggledToc ]
-                    [ text
-                        (if model.tocVisible then
-                            "Hide TOC"
-
-                         else
-                            "Show TOC"
-                        )
-                    ]
-                , button [ onClick ToggledSettings ] [ text "⚙ Settings" ]
-                , button [ onClick ToggledTerminal ] [ text "⌘ Terminal" ]
-                , Html.input
-                    [ Html.Attributes.placeholder "new-file-name"
-                    , Html.Attributes.value model.newName
-                    , onInput SetNewName
-                    , style "width" "300px"
-                    , style "min-width" "150px"
-                    , Html.Attributes.attribute "autocapitalize" "off"
-                    , Html.Attributes.attribute "autocorrect" "off"
-                    , Html.Attributes.attribute "autocomplete" "off"
-                    , Html.Attributes.spellcheck False
-                    ]
-                    []
-                , div [ style "font-size" "12px", style "color" "var(--muted)" ]
-                    [ text (saveLabel model.saveState.saveStatus) ]
-                , button [ onClick ClickedNewFile ] [ text "New" ]
-                , button [ onClick ClickedRename ] [ text "Rename" ]
-                , button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
-                , exportDropdown
-                ]
-
-        readerView =
-            div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
-                (treeCols model ++ renderTocColumns model)
 
         body =
             if model.language == Just Language.Image then
                 imageView model
 
-            else if model.readerMode then
-                readerView
-
             else
-                threePaneRow
+                contentRow model
     in
     div
         [ Html.Attributes.attribute "data-theme" (themeName model.isLight)
@@ -282,7 +250,8 @@ folderIcon isOpen =
         ]
 
 
-{-| A small solid file glyph (filled dark blue), sized to match folderIcon. -}
+{-| A small solid file glyph (filled dark blue), sized to match folderIcon.
+-}
 fileIcon : Html msg
 fileIcon =
     Svg.svg
@@ -479,6 +448,158 @@ imagePane imageSrc =
         []
 
 
+viewModeDropdown : Model -> Html Msg
+viewModeDropdown model =
+    Html.select [ Html.Events.on "change" (D.map SetViewMode Html.Events.targetValue) ]
+        [ Html.option [ Html.Attributes.value "both", Html.Attributes.selected (model.viewMode == ViewBoth) ] [ text "Both" ]
+        , Html.option [ Html.Attributes.value "editor", Html.Attributes.selected (model.viewMode == ViewEditor) ] [ text "Editor" ]
+        , Html.option [ Html.Attributes.value "reader", Html.Attributes.selected (model.viewMode == ViewReader) ] [ text "Reader" ]
+        ]
+
+
+toolbarRow : List (Html Msg) -> Html Msg
+toolbarRow children =
+    div
+        [ style "display" "flex"
+        , style "align-items" "center"
+        , style "gap" "8px"
+        , style "padding" "6px 8px"
+        , style "flex-wrap" "wrap"
+        ]
+        children
+
+
+groupSep : Html msg
+groupSep =
+    div
+        [ style "width" "1px"
+        , style "align-self" "stretch"
+        , style "background" "var(--border)"
+        , style "margin" "0 4px"
+        ]
+        []
+
+
+{-| The content area below the toolbar: tree (when shown), the editor (ALWAYS
+mounted; hidden in Reader mode so CodeMirror keeps its live doc across mode
+switches), and the rendered text + TOC (in Both/Reader). One Html.Keyed row so
+Elm never recreates the editor when siblings appear/disappear.
+-}
+contentRow : Model -> Html Msg
+contentRow model =
+    let
+        ( bodyHtml, tocHtml ) =
+            renderedAndToc model
+
+        showRender =
+            model.viewMode == ViewBoth || model.viewMode == ViewReader
+
+        showToc =
+            showRender && model.tocVisible && not (List.isEmpty tocHtml)
+
+        editorStyles =
+            case model.viewMode of
+                ViewReader ->
+                    [ style "display" "none" ]
+
+                ViewBoth ->
+                    [ style "flex" "0 0 auto"
+                    , style "width" "var(--editor-split, 50%)"
+                    , style "border-right" "1px solid var(--border)"
+                    ]
+
+                ViewEditor ->
+                    [ style "flex" "1" ]
+
+        treeKeyed =
+            if model.treeVisible then
+                [ ( "tree", treeColumn model ) ]
+
+            else
+                []
+
+        editorKeyed =
+            ( "editor"
+            , Html.node "codemirror-editor"
+                ([ Html.Attributes.attribute "text" model.loadedContent
+                 , Html.Attributes.attribute "fill-parent" ""
+                 , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
+                 ]
+                    ++ editorStyles
+                )
+                []
+            )
+
+        editorHandleKeyed =
+            if model.viewMode == ViewBoth then
+                [ ( "ed-handle"
+                  , div
+                        [ Html.Attributes.id "editor-split-handle"
+                        , style "flex" "0 0 auto"
+                        , style "width" "6px"
+                        , style "cursor" "col-resize"
+                        , style "background" "var(--border)"
+                        ]
+                        []
+                  )
+                ]
+
+            else
+                []
+
+        renderKeyed =
+            if showRender then
+                [ ( "render"
+                  , div
+                        ([ Html.Attributes.id Editor.renderedTextId
+                         , style "padding" "16px"
+                         , style "overflow" "auto"
+                         ]
+                            ++ (if showToc then
+                                    [ style "flex" "0 0 auto", style "width" "var(--render-toc-split, 540px)" ]
+
+                                else
+                                    [ style "flex" "1" ]
+                               )
+                        )
+                        [ div [ style "max-width" "5.5in" ] bodyHtml ]
+                  )
+                ]
+
+            else
+                []
+
+        tocKeyed =
+            if showToc then
+                [ ( "toc-handle"
+                  , div
+                        [ Html.Attributes.id "toc-split-handle"
+                        , style "flex" "0 0 auto"
+                        , style "width" "6px"
+                        , style "cursor" "col-resize"
+                        , style "background" "var(--border)"
+                        ]
+                        []
+                  )
+                , ( "toc"
+                  , div
+                        [ style "flex" "1"
+                        , style "border-left" "1px solid var(--border)"
+                        , style "padding" "16px"
+                        , style "overflow" "auto"
+                        ]
+                        tocHtml
+                  )
+                ]
+
+            else
+                []
+    in
+    Html.Keyed.node "div"
+        [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
+        (treeKeyed ++ [ editorKeyed ] ++ editorHandleKeyed ++ renderKeyed ++ tocKeyed)
+
+
 {-| Full-width view for image documents: tree column + image pane.
 -}
 imageView : Model -> Html Msg
@@ -500,7 +621,8 @@ treeCols model =
         []
 
 
-{-| The rendered body and the TOC for the current document. -}
+{-| The rendered body and the TOC for the current document.
+-}
 renderedAndToc : Model -> ( List (Html Msg), List (Html Msg) )
 renderedAndToc model =
     case ( model.language, model.parsedDoc ) of
@@ -524,56 +646,6 @@ renderedAndToc model =
 
         _ ->
             ( previewBody model, [] )
-
-
-{-| The rendered-text column, plus a draggable divider and the TOC column when
-the TOC is shown. The render column keeps id=renderedTextId wrapping the body. -}
-renderTocColumns : Model -> List (Html Msg)
-renderTocColumns model =
-    let
-        ( bodyHtml, tocHtml ) =
-            renderedAndToc model
-
-        showToc =
-            model.tocVisible && not (List.isEmpty tocHtml)
-
-        renderColumn =
-            div
-                ([ Html.Attributes.id Editor.renderedTextId
-                 , style "padding" "16px"
-                 , style "overflow" "auto"
-                 ]
-                    ++ (if showToc then
-                            [ style "flex" "0 0 auto", style "width" "var(--render-toc-split, 540px)" ]
-
-                        else
-                            [ style "flex" "1" ]
-                       )
-                )
-                [ div [ style "max-width" "5.5in" ] bodyHtml ]
-    in
-    renderColumn
-        :: (if showToc then
-                [ div
-                    [ Html.Attributes.id "toc-split-handle"
-                    , style "flex" "0 0 auto"
-                    , style "width" "6px"
-                    , style "cursor" "col-resize"
-                    , style "background" "var(--border)"
-                    ]
-                    []
-                , div
-                    [ style "flex" "1"
-                    , style "border-left" "1px solid var(--border)"
-                    , style "padding" "16px"
-                    , style "overflow" "auto"
-                    ]
-                    tocHtml
-                ]
-
-            else
-                []
-           )
 
 
 previewBody : Model -> List (Html Msg)
@@ -707,7 +779,8 @@ rightTabs =
     [ ( "shell1", "Shell 1" ), ( "shell2", "Shell 2" ), ( "scratch", "Scratch" ) ]
 
 
-{-| Shell 1's tab label: the open vault's folder name, or "Shell 1" if none. -}
+{-| Shell 1's tab label: the open vault's folder name, or "Shell 1" if none.
+-}
 vaultShellLabel : Maybe String -> String
 vaultShellLabel vaultRoot =
     case vaultRoot of
