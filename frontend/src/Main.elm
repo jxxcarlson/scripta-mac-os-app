@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import AiConfig
 import Browser
+import Browser.Events
 import Chat
 import Dict
 import Export
@@ -854,7 +855,28 @@ subscriptions _ =
         , FileOps.fileChanged GotFileChanged
         , FileOps.openFile GotOpenFile
         , FileOps.gotOpenFolders GotOpenFolders
+        , Browser.Events.onKeyDown navKeyDecoder
         ]
+
+
+{-| Cmd+[ -> Prev, Cmd+] -> Next. Fails (no message) for anything else, so it
+does not interfere with normal typing. The update handlers no-op when the
+relevant nav stack is empty.
+-}
+navKeyDecoder : D.Decoder Msg
+navKeyDecoder =
+    D.map2 Tuple.pair (D.field "metaKey" D.bool) (D.field "key" D.string)
+        |> D.andThen
+            (\( meta, key ) ->
+                if meta && key == "[" then
+                    D.succeed ClickedPrev
+
+                else if meta && key == "]" then
+                    D.succeed ClickedNext
+
+                else
+                    D.fail "not a nav shortcut"
+            )
 
 
 relist : Model -> ( Model, Cmd Msg )
