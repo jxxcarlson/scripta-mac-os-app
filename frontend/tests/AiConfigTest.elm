@@ -4,6 +4,7 @@ import AiConfig
 import Dict
 import Expect
 import Json.Decode as D
+import Json.Encode as E
 import Test exposing (Test, describe, test)
 
 
@@ -44,4 +45,33 @@ suite =
                             |> AiConfig.setHint "gemini" "9999"
                 in
                 Expect.equal (Ok cfg) (D.decodeValue AiConfig.decoder (AiConfig.encode cfg))
+        , test "agentDefault maps anthropic to claude" <|
+            \_ -> Expect.equal "claude" (AiConfig.agentDefault "anthropic")
+        , test "agentDefault maps openai to codex" <|
+            \_ -> Expect.equal "codex" (AiConfig.agentDefault "openai")
+        , test "agentDefault maps gemini to gemini" <|
+            \_ -> Expect.equal "gemini" (AiConfig.agentDefault "gemini")
+        , test "agentDefault falls back to claude for unknown" <|
+            \_ -> Expect.equal "claude" (AiConfig.agentDefault "whatever")
+        , test "effectiveAgentCommand uses the active provider default when unset" <|
+            \_ -> Expect.equal "claude" (AiConfig.effectiveAgentCommand AiConfig.init)
+        , test "effectiveAgentCommand uses a non-empty override" <|
+            \_ -> Expect.equal "my-agent" (AiConfig.effectiveAgentCommand (AiConfig.setAgentCommand "my-agent" AiConfig.init))
+        , test "effectiveAgentCommand trims the override" <|
+            \_ -> Expect.equal "my-agent" (AiConfig.effectiveAgentCommand (AiConfig.setAgentCommand "  my-agent  " AiConfig.init))
+        , test "effectiveAgentCommand falls back to default for whitespace override" <|
+            \_ -> Expect.equal "claude" (AiConfig.effectiveAgentCommand (AiConfig.setAgentCommand "   " AiConfig.init))
+        , test "encode/decode round-trips agentCommand" <|
+            \_ ->
+                AiConfig.setAgentCommand "codex" AiConfig.init
+                    |> AiConfig.encode
+                    |> D.decodeValue AiConfig.decoder
+                    |> Result.map .agentCommand
+                    |> Expect.equal (Ok "codex")
+        , test "decoding without agentCommand yields empty string" <|
+            \_ ->
+                E.object [ ( "activeProvider", E.string "openai" ) ]
+                    |> D.decodeValue AiConfig.decoder
+                    |> Result.map .agentCommand
+                    |> Expect.equal (Ok "")
         ]
