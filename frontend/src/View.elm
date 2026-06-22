@@ -1,4 +1,4 @@
-module View exposing (chatMessageView, imagePane, plainTextPreview, rightTabs, themeName, view)
+module View exposing (chatMessageView, imagePane, plainTextPreview, rightTabs, themeName, vaultShellLabel, view)
 
 import AiConfig
 import Chat
@@ -638,6 +638,17 @@ rightTabs =
     [ ( "shell1", "Shell 1" ), ( "shell2", "Shell 2" ), ( "scratch", "Scratch" ) ]
 
 
+{-| Shell 1's tab label: the open vault's folder name, or "Shell 1" if none. -}
+vaultShellLabel : Maybe String -> String
+vaultShellLabel vaultRoot =
+    case vaultRoot of
+        Just root ->
+            PathUtil.basename root
+
+        Nothing ->
+            "Shell 1"
+
+
 terminalTabBar : Model -> Html Msg
 terminalTabBar model =
     div
@@ -652,6 +663,14 @@ terminalTabBar model =
 
 terminalTabButton : Model -> ( String, String ) -> Html Msg
 terminalTabButton model ( tabId, label ) =
+    let
+        shownLabel =
+            if tabId == "shell1" then
+                vaultShellLabel model.vaultRoot
+
+            else
+                label
+    in
     button
         [ onClick (SelectTerminalTab tabId)
         , style "font-weight"
@@ -662,7 +681,7 @@ terminalTabButton model ( tabId, label ) =
                 "400"
             )
         ]
-        [ text label ]
+        [ text shownLabel ]
 
 
 terminalTabContent : Bool -> Html Msg -> Html Msg
