@@ -568,6 +568,13 @@ update msg model =
             in
             ( { model | aiConfig = cfg }, FileOps.saveAiConfig (AiConfig.encode cfg) )
 
+        SetAgentCommand cmd ->
+            let
+                cfg =
+                    AiConfig.setAgentCommand cmd model.aiConfig
+            in
+            ( { model | aiConfig = cfg }, FileOps.saveAiConfig (AiConfig.encode cfg) )
+
         AiKeyInput provider keyText ->
             ( { model | aiKeyInput = Dict.insert provider keyText model.aiKeyInput }, Cmd.none )
 

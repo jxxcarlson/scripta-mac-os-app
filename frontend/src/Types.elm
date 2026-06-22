@@ -113,6 +113,7 @@ type Msg
     | ToggledSettings
     | SetActiveProvider String
     | SetProviderModel String String
+    | SetAgentCommand String
     | AiKeyInput String String
     | SubmitApiKey String
     | DeleteApiKey String

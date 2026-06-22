@@ -1,4 +1,4 @@
-module View exposing (chatMessageView, imagePane, plainTextPreview, rightTabs, themeName, view)
+module View exposing (chatMessageView, imagePane, plainTextPreview, rightTabs, themeName, vaultShellLabel, view)
 
 import AiConfig
 import Chat
@@ -334,6 +334,26 @@ folderIcon isOpen =
         ]
 
 
+{-| A small solid file glyph (filled dark blue), sized to match folderIcon. -}
+fileIcon : Html msg
+fileIcon =
+    Svg.svg
+        [ SA.width "13"
+        , SA.height "13"
+        , SA.viewBox "0 0 16 16"
+        , SA.style "vertical-align: middle; margin-right: 5px;"
+        ]
+        [ Svg.path
+            [ SA.d "M3 1.5 H9 L13 5.5 V14.5 H3 Z M9 1.5 V5.5 H13"
+            , SA.fill "#3b6ea5"
+            , SA.stroke "#3b6ea5"
+            , SA.strokeWidth "1"
+            , SA.strokeLinejoin "round"
+            ]
+            []
+        ]
+
+
 searchBox : Model -> Html Msg
 searchBox model =
     Html.input
@@ -413,7 +433,7 @@ nodeView forceOpen highlights openFolders node =
                             []
                        )
                 )
-                [ span [ style "flex" "0 0 auto", style "margin-right" "5px" ] [ text "-" ]
+                [ span [ style "flex" "0 0 auto", style "margin-right" "5px" ] [ fileIcon ]
                 , span [ style "flex" "1 1 auto" ] [ text r.name ]
                 ]
 
@@ -542,6 +562,7 @@ settingsOverlay model =
             , div [ style "color" "var(--muted)", style "font-size" "12px", style "margin-bottom" "16px" ]
                 [ text "Keys are stored in your macOS Keychain. Only the last 4 characters are shown back." ]
             , activeProviderRow model
+            , agentCommandRow model
             , div [ style "height" "12px" ] []
             , div [] (List.map (providerRow model) AiConfig.providers)
             ]
@@ -617,6 +638,17 @@ rightTabs =
     [ ( "shell1", "Shell 1" ), ( "shell2", "Shell 2" ), ( "scratch", "Scratch" ) ]
 
 
+{-| Shell 1's tab label: the open vault's folder name, or "Shell 1" if none. -}
+vaultShellLabel : Maybe String -> String
+vaultShellLabel vaultRoot =
+    case vaultRoot of
+        Just root ->
+            PathUtil.basename root
+
+        Nothing ->
+            "Shell 1"
+
+
 terminalTabBar : Model -> Html Msg
 terminalTabBar model =
     div
@@ -631,6 +663,14 @@ terminalTabBar model =
 
 terminalTabButton : Model -> ( String, String ) -> Html Msg
 terminalTabButton model ( tabId, label ) =
+    let
+        shownLabel =
+            if tabId == "shell1" then
+                vaultShellLabel model.vaultRoot
+
+            else
+                label
+    in
     button
         [ onClick (SelectTerminalTab tabId)
         , style "font-weight"
@@ -641,7 +681,7 @@ terminalTabButton model ( tabId, label ) =
                 "400"
             )
         ]
-        [ text label ]
+        [ text shownLabel ]
 
 
 terminalTabContent : Bool -> Html Msg -> Html Msg
@@ -805,14 +845,39 @@ chatKeydownDecoder =
 
 terminalPane : String -> Model -> Html Msg
 terminalPane termId model =
-    Html.node "terminal-pane"
-        [ Html.Attributes.attribute "term-id" termId
-        , Html.Attributes.attribute "cwd" (Maybe.withDefault "" model.vaultRoot)
-        , style "display" "block"
-        , style "width" "100%"
-        , style "height" "100%"
-        ]
-        []
+    case ( termId, model.vaultRoot ) of
+        ( "shell1", Nothing ) ->
+            -- Defer opening the agent shell's pty until the vault is restored at
+            -- startup. The cd+agent auto-run is write-once on first open, so
+            -- opening before vaultRoot is known would land the shell in $HOME and
+            -- permanently skip the agent for the session.
+            div
+                [ style "padding" "12px"
+                , style "color" "var(--muted)"
+                ]
+                [ text "Open a vault to start the agent shell." ]
+
+        _ ->
+            let
+                initCmd =
+                    case ( termId, model.vaultRoot ) of
+                        ( "shell1", Just root ) ->
+                            -- NOTE: single-quote wrapping only; a literal ' in the
+                            -- vault path is unsupported (out of scope).
+                            "cd '" ++ root ++ "' && " ++ AiConfig.effectiveAgentCommand model.aiConfig
+
+                        _ ->
+                            ""
+            in
+            Html.node "terminal-pane"
+                [ Html.Attributes.attribute "term-id" termId
+                , Html.Attributes.attribute "cwd" (Maybe.withDefault "" model.vaultRoot)
+                , Html.Attributes.attribute "init-cmd" initCmd
+                , style "display" "block"
+                , style "width" "100%"
+                , style "height" "100%"
+                ]
+                []
 
 
 scratchPane : Model -> Html Msg
@@ -841,6 +906,22 @@ activeProviderRow model =
                 )
                 AiConfig.providers
             )
+        ]
+
+
+agentCommandRow : Model -> Html Msg
+agentCommandRow model =
+    div [ style "display" "flex", style "align-items" "center", style "gap" "8px", style "margin-bottom" "8px" ]
+        [ Html.label [ style "font-weight" "600", style "font-size" "13px" ] [ text "Agent command:" ]
+        , Html.input
+            [ Html.Attributes.value (AiConfig.effectiveAgentCommand model.aiConfig)
+            , onInput SetAgentCommand
+            , Html.Attributes.attribute "autocapitalize" "off"
+            , Html.Attributes.attribute "autocorrect" "off"
+            , Html.Attributes.spellcheck False
+            , style "flex" "1"
+            ]
+            []
         ]
 
 
