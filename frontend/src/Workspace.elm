@@ -1,7 +1,7 @@
 module Workspace exposing
     ( Entry, Node(..)
     , entryDecoder, toTree, filter
-    , nodeName, nodePath, folderChildren
+    , nodeName, nodePath, folderChildren, splitIndexFile
     )
 
 {-| Workspace (vault) file tree. The Rust shell sends a flat list of `Entry`;
@@ -132,3 +132,26 @@ folderChildren node =
 
         FileNode _ ->
             Nothing
+
+
+{-| Split a folder's immediate children into its `_index.md` file (if any) and
+the remaining children. Only a `FileNode` named exactly `_index.md` matches; a
+folder of that name does not. The remaining children keep their order.
+-}
+splitIndexFile : List Node -> ( Maybe Node, List Node )
+splitIndexFile children =
+    let
+        isIndex n =
+            case n of
+                FileNode r ->
+                    r.name == "_index.md"
+
+                FolderNode _ ->
+                    False
+    in
+    case List.filter isIndex children of
+        idx :: _ ->
+            ( Just idx, List.filter (\n -> not (isIndex n)) children )
+
+        [] ->
+            ( Nothing, children )

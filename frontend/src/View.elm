@@ -441,6 +441,26 @@ nodeView forceOpen highlights openFolders node =
             let
                 isOpen =
                     forceOpen || Set.member r.path openFolders
+
+                ( maybeIndex, restChildren ) =
+                    Workspace.splitIndexFile r.children
+
+                indexLink =
+                    case maybeIndex of
+                        Just (FileNode ir) ->
+                            [ span
+                                [ Html.Events.stopPropagationOn "click" (D.succeed ( ClickedTreeNode ir.path, True ))
+                                , style "flex" "0 0 auto"
+                                , style "margin-left" "6px"
+                                , style "color" "var(--muted)"
+                                , style "cursor" "pointer"
+                                , style "font-size" "12px"
+                                ]
+                                [ text "_index.md" ]
+                            ]
+
+                        _ ->
+                            []
             in
             li []
                 (div
@@ -460,11 +480,13 @@ nodeView forceOpen highlights openFolders node =
                                 []
                            )
                     )
-                    [ span [ style "flex" "0 0 auto", style "margin-right" "5px" ] [ folderIcon isOpen ]
-                    , span [ style "flex" "1 1 auto" ] [ text r.name ]
-                    ]
+                    ([ span [ style "flex" "0 0 auto", style "margin-right" "5px" ] [ folderIcon isOpen ]
+                     , span [ style "flex" "1 1 auto" ] [ text r.name ]
+                     ]
+                        ++ indexLink
+                    )
                     :: (if isOpen then
-                            [ treeView forceOpen highlights openFolders r.children ]
+                            [ treeView forceOpen highlights openFolders restChildren ]
 
                         else
                             []
