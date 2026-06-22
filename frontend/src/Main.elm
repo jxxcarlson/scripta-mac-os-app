@@ -75,6 +75,7 @@ init flagsValue =
         , chatMessages = []
         , chatInput = ""
         , chatPending = False
+        , chatFileTitles = Dict.empty
         }
 
 
@@ -497,6 +498,51 @@ update msg model =
 
         CopyReply text ->
             ( model, FileOps.copyToClipboard text )
+
+        ChatFileTitleInput n s ->
+            ( { model | chatFileTitles = Dict.insert n s model.chatFileTitles }, Cmd.none )
+
+        ClickedChatFile n content ->
+            case model.vaultRoot of
+                Just root ->
+                    let
+                        title =
+                            String.trim (Dict.get n model.chatFileTitles |> Maybe.withDefault "")
+                    in
+                    if String.isEmpty title then
+                        ( model, Cmd.none )
+
+                    else
+                        let
+                            name =
+                                PathUtil.withDefaultExtension "md" title
+
+                            cleared =
+                                { model | chatFileTitles = Dict.remove n model.chatFileTitles }
+                        in
+                        case PathUtil.kbaseRoot root of
+                            Just kroot ->
+                                let
+                                    path =
+                                        "Inbox/" ++ name
+                                in
+                                request (PCreateFile path)
+                                    "create_file"
+                                    [ ( "root", E.string kroot ), ( "path", E.string path ), ( "content", E.string content ) ]
+                                    cleared
+
+                            Nothing ->
+                                let
+                                    path =
+                                        PathUtil.siblingPath model.selectedPath name
+                                in
+                                request (PCreateFile path)
+                                    "create_file"
+                                    [ ( "root", E.string root ), ( "path", E.string path ), ( "content", E.string content ) ]
+                                    cleared
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         ClickedReload ->
             relist model

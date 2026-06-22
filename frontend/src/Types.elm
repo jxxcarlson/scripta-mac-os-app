@@ -46,6 +46,7 @@ type alias Model =
     , chatMessages : List Chat.ChatMessage
     , chatInput : String
     , chatPending : Bool
+    , chatFileTitles : Dict Int String
     }
 
 
@@ -119,3 +120,5 @@ type Msg
     | ClickedReload
     | ChatInput String
     | SendChat
+    | ChatFileTitleInput Int String
+    | ClickedChatFile Int String
