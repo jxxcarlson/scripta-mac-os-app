@@ -72,7 +72,7 @@
         --cm-syntax-property-key: #005cc5;
       }
 
-      :root { --terminal-height: 280px; --terminal-split: 50%; }
+      :root { --terminal-height: 280px; --terminal-split: 50%; --editor-split: 50%; }
 
       [data-theme="dark"] {
         --app-bg: #1e1e1e;
@@ -360,6 +360,41 @@
         window.addEventListener('resize', function () {
           var s = parseInt(lsGet('terminalSplit'), 10);
           if (!isNaN(s)) applySplit(s, true);
+        });
+      })();
+
+      // --- Vertical divider between the source editor (left) and rendered preview (right). ---
+      (function () {
+        var editorLeft = 0;
+        function applyEditorSplit(px, persist) {
+          var w = Math.max(200, Math.min(window.innerWidth - 200, px));
+          document.documentElement.style.setProperty('--editor-split', w + 'px');
+          if (persist) { try { localStorage.setItem('editorSplit', w); } catch (e) {} }
+          return w;
+        }
+        var saved = parseInt(lsGet('editorSplit'), 10);
+        if (!isNaN(saved)) applyEditorSplit(saved, true);
+        var dragging = false;
+        document.addEventListener('pointerdown', function (e) {
+          if (e.target && e.target.id === 'editor-split-handle') {
+            var ed = document.querySelector('codemirror-editor');
+            editorLeft = ed ? ed.getBoundingClientRect().left : 0;
+            dragging = true;
+            e.preventDefault();
+          }
+        });
+        document.addEventListener('pointermove', function (e) {
+          if (!dragging) return;
+          applyEditorSplit(e.clientX - editorLeft, false);
+        });
+        document.addEventListener('pointerup', function (e) {
+          if (!dragging) return;
+          dragging = false;
+          applyEditorSplit(e.clientX - editorLeft, true);
+        });
+        window.addEventListener('resize', function () {
+          var s = parseInt(lsGet('editorSplit'), 10);
+          if (!isNaN(s)) applyEditorSplit(s, true);
         });
       })();
 

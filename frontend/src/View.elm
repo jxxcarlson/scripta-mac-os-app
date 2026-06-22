@@ -66,8 +66,17 @@ view model =
                     [ Html.Attributes.attribute "text" model.loadedContent
                     , Html.Attributes.attribute "fill-parent" ""
                     , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
-                    , style "flex" "1"
+                    , style "flex" "0 0 auto"
+                    , style "width" "var(--editor-split, 50%)"
                     , style "border-right" "1px solid var(--border)"
+                    ]
+                    []
+                , div
+                    [ Html.Attributes.id "editor-split-handle"
+                    , style "flex" "0 0 auto"
+                    , style "width" "6px"
+                    , style "cursor" "col-resize"
+                    , style "background" "var(--border)"
                     ]
                     []
                 , div
