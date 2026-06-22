@@ -244,8 +244,8 @@
           this._term = term;
           this._fit = fit;
           this._id = id;
-          this._fitAndResize();
-          invoke('terminal_open', { id: id, cwd: cwd, cols: term.cols, rows: term.rows }).catch(function () {});
+          this._cwd = cwd;
+          this._opened = false;
           term.onData(function (d) { invoke('terminal_input', { id: id, data: d }).catch(function () {}); });
           this._unlistenOut = listen('terminal-output', function (e) {
             if (e.payload && e.payload.id === id) term.write(b64ToBytes(e.payload.data));
@@ -254,13 +254,22 @@
             if (e.payload && e.payload.id === id) term.write('\r\n[process exited]\r\n');
           });
           const self = this;
-          this._ro = new ResizeObserver(function () { self._fitAndResize(); });
+          this._ro = new ResizeObserver(function () { self._openOrResize(); });
           this._ro.observe(this);
+          // Open the pty lazily — only once the pane is visible and fitted to its
+          // real size. Opening while the tab is hidden (offsetWidth 0) would create
+          // the pty at xterm's default 80x24; the post-show resize would then desync
+          // the shell's line state and scramble input. See _openOrResize.
+          this._openOrResize();
         }
-        _fitAndResize() {
+        _openOrResize() {
           if (this.offsetWidth === 0 || this.offsetHeight === 0) return;
           try { this._fit.fit(); } catch (e) { return; }
-          if (this._term.cols > 0 && this._term.rows > 0) {
+          if (this._term.cols <= 0 || this._term.rows <= 0) return;
+          if (!this._opened) {
+            this._opened = true;
+            invoke('terminal_open', { id: this._id, cwd: this._cwd, cols: this._term.cols, rows: this._term.rows }).catch(function () {});
+          } else {
             invoke('terminal_resize', { id: this._id, cols: this._term.cols, rows: this._term.rows }).catch(function () {});
           }
         }
