@@ -54,30 +54,6 @@ themeName isLight =
 view : Model -> Html Msg
 view model =
     let
-        threePaneRow =
-            div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
-                (treeCols model
-                    ++ [ Html.node "codemirror-editor"
-                            [ Html.Attributes.attribute "text" model.loadedContent
-                            , Html.Attributes.attribute "fill-parent" ""
-                            , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
-                            , style "flex" "0 0 auto"
-                            , style "width" "var(--editor-split, 50%)"
-                            , style "border-right" "1px solid var(--border)"
-                            ]
-                            []
-                       , div
-                            [ Html.Attributes.id "editor-split-handle"
-                            , style "flex" "0 0 auto"
-                            , style "width" "6px"
-                            , style "cursor" "col-resize"
-                            , style "background" "var(--border)"
-                            ]
-                            []
-                       ]
-                    ++ renderTocColumns model
-                )
-
         toolbar =
             div [ style "border-bottom" "1px solid var(--border)" ]
                 [ toolbarRow
@@ -163,24 +139,12 @@ view model =
                     ]
                 ]
 
-        readerView =
-            div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
-                (treeCols model ++ renderTocColumns model)
-
         body =
             if model.language == Just Language.Image then
                 imageView model
 
             else
-                case model.viewMode of
-                    ViewBoth ->
-                        threePaneRow
-
-                    ViewReader ->
-                        readerView
-
-                    ViewEditor ->
-                        editorOnlyView model
+                contentRow model
     in
     div
         [ Html.Attributes.attribute "data-theme" (themeName model.isLight)
@@ -286,7 +250,8 @@ folderIcon isOpen =
         ]
 
 
-{-| A small solid file glyph (filled dark blue), sized to match folderIcon. -}
+{-| A small solid file glyph (filled dark blue), sized to match folderIcon.
+-}
 fileIcon : Html msg
 fileIcon =
     Svg.svg
@@ -483,21 +448,6 @@ imagePane imageSrc =
         []
 
 
-editorOnlyView : Model -> Html Msg
-editorOnlyView model =
-    div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
-        (treeCols model
-            ++ [ Html.node "codemirror-editor"
-                    [ Html.Attributes.attribute "text" model.loadedContent
-                    , Html.Attributes.attribute "fill-parent" ""
-                    , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
-                    , style "flex" "1"
-                    ]
-                    []
-               ]
-        )
-
-
 viewModeDropdown : Model -> Html Msg
 viewModeDropdown model =
     Html.select [ Html.Events.on "change" (D.map SetViewMode Html.Events.targetValue) ]
@@ -530,6 +480,126 @@ groupSep =
         []
 
 
+{-| The content area below the toolbar: tree (when shown), the editor (ALWAYS
+mounted; hidden in Reader mode so CodeMirror keeps its live doc across mode
+switches), and the rendered text + TOC (in Both/Reader). One Html.Keyed row so
+Elm never recreates the editor when siblings appear/disappear.
+-}
+contentRow : Model -> Html Msg
+contentRow model =
+    let
+        ( bodyHtml, tocHtml ) =
+            renderedAndToc model
+
+        showRender =
+            model.viewMode == ViewBoth || model.viewMode == ViewReader
+
+        showToc =
+            showRender && model.tocVisible && not (List.isEmpty tocHtml)
+
+        editorStyles =
+            case model.viewMode of
+                ViewReader ->
+                    [ style "display" "none" ]
+
+                ViewBoth ->
+                    [ style "flex" "0 0 auto"
+                    , style "width" "var(--editor-split, 50%)"
+                    , style "border-right" "1px solid var(--border)"
+                    ]
+
+                ViewEditor ->
+                    [ style "flex" "1" ]
+
+        treeKeyed =
+            if model.treeVisible then
+                [ ( "tree", treeColumn model ) ]
+
+            else
+                []
+
+        editorKeyed =
+            ( "editor"
+            , Html.node "codemirror-editor"
+                ([ Html.Attributes.attribute "text" model.loadedContent
+                 , Html.Attributes.attribute "fill-parent" ""
+                 , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
+                 ]
+                    ++ editorStyles
+                )
+                []
+            )
+
+        editorHandleKeyed =
+            if model.viewMode == ViewBoth then
+                [ ( "ed-handle"
+                  , div
+                        [ Html.Attributes.id "editor-split-handle"
+                        , style "flex" "0 0 auto"
+                        , style "width" "6px"
+                        , style "cursor" "col-resize"
+                        , style "background" "var(--border)"
+                        ]
+                        []
+                  )
+                ]
+
+            else
+                []
+
+        renderKeyed =
+            if showRender then
+                [ ( "render"
+                  , div
+                        ([ Html.Attributes.id Editor.renderedTextId
+                         , style "padding" "16px"
+                         , style "overflow" "auto"
+                         ]
+                            ++ (if showToc then
+                                    [ style "flex" "0 0 auto", style "width" "var(--render-toc-split, 540px)" ]
+
+                                else
+                                    [ style "flex" "1" ]
+                               )
+                        )
+                        [ div [ style "max-width" "5.5in" ] bodyHtml ]
+                  )
+                ]
+
+            else
+                []
+
+        tocKeyed =
+            if showToc then
+                [ ( "toc-handle"
+                  , div
+                        [ Html.Attributes.id "toc-split-handle"
+                        , style "flex" "0 0 auto"
+                        , style "width" "6px"
+                        , style "cursor" "col-resize"
+                        , style "background" "var(--border)"
+                        ]
+                        []
+                  )
+                , ( "toc"
+                  , div
+                        [ style "flex" "1"
+                        , style "border-left" "1px solid var(--border)"
+                        , style "padding" "16px"
+                        , style "overflow" "auto"
+                        ]
+                        tocHtml
+                  )
+                ]
+
+            else
+                []
+    in
+    Html.Keyed.node "div"
+        [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
+        (treeKeyed ++ [ editorKeyed ] ++ editorHandleKeyed ++ renderKeyed ++ tocKeyed)
+
+
 {-| Full-width view for image documents: tree column + image pane.
 -}
 imageView : Model -> Html Msg
@@ -551,7 +621,8 @@ treeCols model =
         []
 
 
-{-| The rendered body and the TOC for the current document. -}
+{-| The rendered body and the TOC for the current document.
+-}
 renderedAndToc : Model -> ( List (Html Msg), List (Html Msg) )
 renderedAndToc model =
     case ( model.language, model.parsedDoc ) of
@@ -575,56 +646,6 @@ renderedAndToc model =
 
         _ ->
             ( previewBody model, [] )
-
-
-{-| The rendered-text column, plus a draggable divider and the TOC column when
-the TOC is shown. The render column keeps id=renderedTextId wrapping the body. -}
-renderTocColumns : Model -> List (Html Msg)
-renderTocColumns model =
-    let
-        ( bodyHtml, tocHtml ) =
-            renderedAndToc model
-
-        showToc =
-            model.tocVisible && not (List.isEmpty tocHtml)
-
-        renderColumn =
-            div
-                ([ Html.Attributes.id Editor.renderedTextId
-                 , style "padding" "16px"
-                 , style "overflow" "auto"
-                 ]
-                    ++ (if showToc then
-                            [ style "flex" "0 0 auto", style "width" "var(--render-toc-split, 540px)" ]
-
-                        else
-                            [ style "flex" "1" ]
-                       )
-                )
-                [ div [ style "max-width" "5.5in" ] bodyHtml ]
-    in
-    renderColumn
-        :: (if showToc then
-                [ div
-                    [ Html.Attributes.id "toc-split-handle"
-                    , style "flex" "0 0 auto"
-                    , style "width" "6px"
-                    , style "cursor" "col-resize"
-                    , style "background" "var(--border)"
-                    ]
-                    []
-                , div
-                    [ style "flex" "1"
-                    , style "border-left" "1px solid var(--border)"
-                    , style "padding" "16px"
-                    , style "overflow" "auto"
-                    ]
-                    tocHtml
-                ]
-
-            else
-                []
-           )
 
 
 previewBody : Model -> List (Html Msg)
@@ -758,7 +779,8 @@ rightTabs =
     [ ( "shell1", "Shell 1" ), ( "shell2", "Shell 2" ), ( "scratch", "Scratch" ) ]
 
 
-{-| Shell 1's tab label: the open vault's folder name, or "Shell 1" if none. -}
+{-| Shell 1's tab label: the open vault's folder name, or "Shell 1" if none.
+-}
 vaultShellLabel : Maybe String -> String
 vaultShellLabel vaultRoot =
     case vaultRoot of
