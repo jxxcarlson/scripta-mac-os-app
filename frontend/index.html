@@ -367,7 +367,10 @@
       (function () {
         var editorLeft = 0;
         function applyEditorSplit(px, persist) {
-          var w = Math.max(200, Math.min(window.innerWidth - 200, px));
+          var ed = document.querySelector('codemirror-editor');
+          var left = ed ? ed.getBoundingClientRect().left : 0;
+          var maxW = Math.max(200, window.innerWidth - left - 200);
+          var w = Math.max(200, Math.min(maxW, px));
           document.documentElement.style.setProperty('--editor-split', w + 'px');
           if (persist) { try { localStorage.setItem('editorSplit', w); } catch (e) {} }
           return w;
