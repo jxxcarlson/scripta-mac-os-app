@@ -63,7 +63,7 @@ suite =
                     |> .toc
                     |> Html.div []
                     |> Query.fromHtml
-                    |> Query.findAll [ Selector.tag "span" ]
+                    |> Query.findAll [ Selector.tag "span", Selector.style "color" "var(--link)" ]
                     |> Query.index 0
                     |> Event.simulate Event.click
                     |> Event.expect (Render.ScrollTo "hello-world")

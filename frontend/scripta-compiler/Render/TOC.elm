@@ -176,12 +176,13 @@ buildTocItem params entry =
     Html.div
         [ HA.style "margin-left" (String.fromInt indent ++ "px")
         , HA.style "margin-bottom" "0.25em"
-        , HA.style "overflow" "hidden"
-        , HA.style "white-space" "nowrap"
-        , HA.style "text-overflow" "ellipsis"
+        , HA.style "padding-left" "1.1em"
+        , HA.style "text-indent" "-1.1em"
         , HA.title (prefix ++ entry.title)
         ]
-        [ Html.a
+        [ Html.span [ HA.style "font-weight" "bold" ] [ Html.text "•" ]
+        , Html.text " "
+        , Html.a
             [ HA.href ("#" ++ entry.id)
             , HE.onClick (SelectId entry.id)
             , HA.style "color"

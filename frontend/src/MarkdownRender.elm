@@ -210,13 +210,21 @@ tocItemView (Item _ str kids) =
                 , style "color" "var(--link)"
                 ]
                 [ Html.text str ]
+
+        line =
+            Html.div
+                [ style "padding-left" "1.1em", style "text-indent" "-1.1em" ]
+                [ Html.span [ style "font-weight" "bold" ] [ Html.text "•" ]
+                , Html.text " "
+                , link
+                ]
     in
     if List.isEmpty kids then
-        Html.li [] [ link ]
+        Html.li [] [ line ]
 
     else
         Html.li []
-            [ link
+            [ line
             , Html.ul (ulStyle "1em")
                 (List.map tocItemView kids)
             ]
