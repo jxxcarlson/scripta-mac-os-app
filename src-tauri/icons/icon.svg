@@ -4,14 +4,6 @@
   </defs>
   <rect x="2" y="2" width="96" height="96" rx="22" fill="#d6e8fb"/>
   <g clip-path="url(#r)">
-    <g transform="rotate(40 50 50)" fill="none" stroke="#1d3a8a" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
-      <line x1="38" y1="22" x2="38" y2="-34"/>
-      <line x1="62" y1="22" x2="62" y2="-34"/>
-      <path d="M34,30 C34,22 66,22 66,30 L66,38 C66,40 34,40 34,38 Z"/>
-      <line x1="34" y1="34" x2="66" y2="34"/>
-      <path d="M50,94 C42,79 32,61 30,46 C29,40 38,36 50,36 C62,36 71,40 70,46 C68,61 58,79 50,94 Z"/>
-      <circle cx="50" cy="50" r="4.5"/>
-      <line x1="50" y1="54.5" x2="50" y2="92"/>
-    </g>
+    <text x="50" y="50" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="64" fill="#1d3a8a">K</text>
   </g>
 </svg>
