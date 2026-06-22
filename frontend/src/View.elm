@@ -135,9 +135,11 @@ view model =
                     [ Html.Attributes.placeholder "new-file-name"
                     , Html.Attributes.value model.newName
                     , onInput SetNewName
-                    , style "width" "150px"
+                    , style "width" "300px"
+                    , style "min-width" "150px"
                     , Html.Attributes.attribute "autocapitalize" "off"
                     , Html.Attributes.attribute "autocorrect" "off"
+                    , Html.Attributes.attribute "autocomplete" "off"
                     , Html.Attributes.spellcheck False
                     ]
                     []
