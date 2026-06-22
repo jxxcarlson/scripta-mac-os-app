@@ -17,7 +17,7 @@ import SaveState
 import Set exposing (Set)
 import Svg
 import Svg.Attributes as SA
-import Types exposing (Model, Msg(..))
+import Types exposing (Model, Msg(..), ViewMode(..))
 import Workspace exposing (Node(..))
 
 
@@ -79,89 +79,88 @@ view model =
                 )
 
         toolbar =
-            div
-                [ style "display" "flex"
-                , style "align-items" "center"
-                , style "gap" "8px"
-                , style "padding" "6px 8px"
-                , style "border-bottom" "1px solid var(--border)"
-                , style "flex-wrap" "wrap"
-                ]
-                [ button
-                    [ onClick ClickedPrev
-                    , Html.Attributes.disabled (List.isEmpty model.history)
-                    ]
-                    [ text "← Prev" ]
-                , button
-                    [ onClick ClickedNext
-                    , Html.Attributes.disabled (List.isEmpty model.future)
-                    ]
-                    [ text "Next →" ]
-                , button [ onClick ToggledReaderMode ]
-                    [ text
-                        (if model.readerMode then
-                            "Exit Reader"
+            div [ style "border-bottom" "1px solid var(--border)" ]
+                [ toolbarRow
+                    [ button
+                        [ onClick ClickedPrev
+                        , Html.Attributes.disabled (List.isEmpty model.history)
+                        ]
+                        [ text "← Prev" ]
+                    , button
+                        [ onClick ClickedNext
+                        , Html.Attributes.disabled (List.isEmpty model.future)
+                        ]
+                        [ text "Next →" ]
+                    , groupSep
+                    , button [ onClick ToggledTree ]
+                        [ text
+                            (if model.treeVisible then
+                                "Hide Tree"
 
-                         else
-                            "Reader"
-                        )
-                    ]
-                , button [ onClick ToggledParseMode ]
-                    [ text
-                        (if model.fullParse then
-                            "Parse: Full"
+                             else
+                                "Show Tree"
+                            )
+                        ]
+                    , viewModeDropdown model
+                    , button [ onClick ToggledToc ]
+                        [ text
+                            (if model.tocVisible then
+                                "Hide TOC"
 
-                         else
-                            "Parse: Incremental"
-                        )
-                    ]
-                , button [ onClick ToggledTheme ]
-                    [ text
-                        (if model.isLight then
-                            "Dark"
+                             else
+                                "Show TOC"
+                            )
+                        ]
+                    , button [ onClick ToggledTerminal ]
+                        [ text
+                            (if model.terminalVisible then
+                                "Hide Terminal"
 
-                         else
-                            "Light"
-                        )
+                             else
+                                "Show Terminal"
+                            )
+                        ]
                     ]
-                , button [ onClick ToggledTree ]
-                    [ text
-                        (if model.treeVisible then
-                            "Hide Tree"
+                , toolbarRow
+                    [ Html.input
+                        [ Html.Attributes.placeholder "new-file-name"
+                        , Html.Attributes.value model.newName
+                        , onInput SetNewName
+                        , style "width" "300px"
+                        , style "min-width" "150px"
+                        , Html.Attributes.attribute "autocapitalize" "off"
+                        , Html.Attributes.attribute "autocorrect" "off"
+                        , Html.Attributes.attribute "autocomplete" "off"
+                        , Html.Attributes.spellcheck False
+                        ]
+                        []
+                    , div [ style "font-size" "12px", style "color" "var(--muted)" ]
+                        [ text (saveLabel model.saveState.saveStatus) ]
+                    , button [ onClick ClickedNewFile ] [ text "New" ]
+                    , button [ onClick ClickedRename ] [ text "Rename" ]
+                    , button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
+                    , exportDropdown
+                    , groupSep
+                    , button [ onClick ToggledParseMode ]
+                        [ text
+                            (if model.fullParse then
+                                "Parse: Full"
 
-                         else
-                            "Show Tree"
-                        )
-                    ]
-                , button [ onClick ToggledToc ]
-                    [ text
-                        (if model.tocVisible then
-                            "Hide TOC"
+                             else
+                                "Parse: Incremental"
+                            )
+                        ]
+                    , button [ onClick ToggledTheme ]
+                        [ text
+                            (if model.isLight then
+                                "Dark"
 
-                         else
-                            "Show TOC"
-                        )
+                             else
+                                "Light"
+                            )
+                        ]
+                    , button [ onClick ToggledSettings ] [ text "⚙ Settings" ]
                     ]
-                , button [ onClick ToggledSettings ] [ text "⚙ Settings" ]
-                , button [ onClick ToggledTerminal ] [ text "⌘ Terminal" ]
-                , Html.input
-                    [ Html.Attributes.placeholder "new-file-name"
-                    , Html.Attributes.value model.newName
-                    , onInput SetNewName
-                    , style "width" "300px"
-                    , style "min-width" "150px"
-                    , Html.Attributes.attribute "autocapitalize" "off"
-                    , Html.Attributes.attribute "autocorrect" "off"
-                    , Html.Attributes.attribute "autocomplete" "off"
-                    , Html.Attributes.spellcheck False
-                    ]
-                    []
-                , div [ style "font-size" "12px", style "color" "var(--muted)" ]
-                    [ text (saveLabel model.saveState.saveStatus) ]
-                , button [ onClick ClickedNewFile ] [ text "New" ]
-                , button [ onClick ClickedRename ] [ text "Rename" ]
-                , button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
-                , exportDropdown
                 ]
 
         readerView =
@@ -172,11 +171,16 @@ view model =
             if model.language == Just Language.Image then
                 imageView model
 
-            else if model.readerMode then
-                readerView
-
             else
-                threePaneRow
+                case model.viewMode of
+                    ViewBoth ->
+                        threePaneRow
+
+                    ViewReader ->
+                        readerView
+
+                    ViewEditor ->
+                        editorOnlyView model
     in
     div
         [ Html.Attributes.attribute "data-theme" (themeName model.isLight)
@@ -475,6 +479,53 @@ imagePane imageSrc =
         [ Html.Attributes.src (Maybe.withDefault "" imageSrc)
         , style "max-width" "100%"
         , style "height" "auto"
+        ]
+        []
+
+
+editorOnlyView : Model -> Html Msg
+editorOnlyView model =
+    div [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
+        (treeCols model
+            ++ [ Html.node "codemirror-editor"
+                    [ Html.Attributes.attribute "text" model.loadedContent
+                    , Html.Attributes.attribute "fill-parent" ""
+                    , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
+                    , style "flex" "1"
+                    ]
+                    []
+               ]
+        )
+
+
+viewModeDropdown : Model -> Html Msg
+viewModeDropdown model =
+    Html.select [ Html.Events.on "change" (D.map SetViewMode Html.Events.targetValue) ]
+        [ Html.option [ Html.Attributes.value "both", Html.Attributes.selected (model.viewMode == ViewBoth) ] [ text "Both" ]
+        , Html.option [ Html.Attributes.value "editor", Html.Attributes.selected (model.viewMode == ViewEditor) ] [ text "Editor" ]
+        , Html.option [ Html.Attributes.value "reader", Html.Attributes.selected (model.viewMode == ViewReader) ] [ text "Reader" ]
+        ]
+
+
+toolbarRow : List (Html Msg) -> Html Msg
+toolbarRow children =
+    div
+        [ style "display" "flex"
+        , style "align-items" "center"
+        , style "gap" "8px"
+        , style "padding" "6px 8px"
+        , style "flex-wrap" "wrap"
+        ]
+        children
+
+
+groupSep : Html msg
+groupSep =
+    div
+        [ style "width" "1px"
+        , style "align-self" "stretch"
+        , style "background" "var(--border)"
+        , style "margin" "0 4px"
         ]
         []
 

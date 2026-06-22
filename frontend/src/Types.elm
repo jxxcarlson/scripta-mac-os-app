@@ -34,7 +34,7 @@ type alias Model =
     , newName : String
     , openFolders : Set String
     , searchQuery : String
-    , readerMode : Bool
+    , viewMode : ViewMode
     , treeVisible : Bool
     , tocVisible : Bool
     , fullParse : Bool
@@ -127,7 +127,7 @@ type Msg
     | ToggledFolder String
     | GotOpenFolders D.Value
     | SetSearchQuery String
-    | ToggledReaderMode
+    | SetViewMode String
     | ToggledParseMode
     | ToggledTheme
     | ClickedPrev

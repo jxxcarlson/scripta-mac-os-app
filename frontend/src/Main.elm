@@ -20,7 +20,7 @@ import Scripta
 import Set
 import Task
 import PathUtil
-import Types exposing (Model, Msg(..), PendingOp(..))
+import Types exposing (Model, Msg(..), PendingOp(..), ViewMode(..), viewModeFromString)
 import View
 import Workspace
 
@@ -65,7 +65,7 @@ init flagsValue =
         , newName = ""
         , openFolders = Set.empty
         , searchQuery = ""
-        , readerMode = flags.readerMode
+        , viewMode = ViewBoth
         , treeVisible = True
         , tocVisible = False
         , fullParse = flags.fullParse
@@ -490,12 +490,8 @@ update msg model =
         SetSearchQuery q ->
             ( { model | searchQuery = q }, Cmd.none )
 
-        ToggledReaderMode ->
-            let
-                rm =
-                    not model.readerMode
-            in
-            ( { model | readerMode = rm }, FileOps.saveReaderMode rm )
+        SetViewMode v ->
+            ( { model | viewMode = viewModeFromString v }, Cmd.none )
 
         ToggledTheme ->
             let
