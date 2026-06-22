@@ -23,7 +23,7 @@ import Workspace exposing (Node(..))
 
 treeColumn : Model -> Html Msg
 treeColumn model =
-    div [ style "width" "calc(260px + 2mm)", style "border-right" "1px solid var(--border)", style "padding" "8px", style "overflow" "auto", style "background" "var(--panel-bg)" ]
+    div [ style "flex" "0 0 auto", style "width" "calc(260px + 2mm)", style "border-right" "1px solid var(--border)", style "padding" "8px", style "overflow" "auto", style "background" "var(--panel-bg)" ]
         (div [ style "display" "flex", style "gap" "4px" ]
             [ button [ onClick ClickedOpenVault ] [ text "Open Vault" ]
             , button [ onClick ClickedChangeVault ] [ text "Change Vault" ]
@@ -503,8 +503,9 @@ contentRow model =
                     [ style "display" "none" ]
 
                 ViewBoth ->
-                    [ style "flex" "0 0 auto"
+                    [ style "flex" "0 1 auto"
                     , style "width" "var(--editor-split, 50%)"
+                    , style "min-width" "0"
                     , style "border-right" "1px solid var(--border)"
                     ]
 
