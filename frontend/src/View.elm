@@ -845,9 +845,19 @@ chatKeydownDecoder =
 
 terminalPane : String -> Model -> Html Msg
 terminalPane termId model =
+    let
+        initCmd =
+            case ( termId, model.vaultRoot ) of
+                ( "shell1", Just root ) ->
+                    "cd '" ++ root ++ "' && " ++ AiConfig.effectiveAgentCommand model.aiConfig
+
+                _ ->
+                    ""
+    in
     Html.node "terminal-pane"
         [ Html.Attributes.attribute "term-id" termId
         , Html.Attributes.attribute "cwd" (Maybe.withDefault "" model.vaultRoot)
+        , Html.Attributes.attribute "init-cmd" initCmd
         , style "display" "block"
         , style "width" "100%"
         , style "height" "100%"

@@ -268,7 +268,7 @@
           if (this._term.cols <= 0 || this._term.rows <= 0) return;
           if (!this._opened) {
             this._opened = true;
-            invoke('terminal_open', { id: this._id, cwd: this._cwd, cols: this._term.cols, rows: this._term.rows }).catch(function () {});
+            invoke('terminal_open', { id: this._id, cwd: this._cwd, cols: this._term.cols, rows: this._term.rows, initCmd: this.getAttribute('init-cmd') || '' }).catch(function () {});
           } else {
             invoke('terminal_resize', { id: this._id, cols: this._term.cols, rows: this._term.rows }).catch(function () {});
           }

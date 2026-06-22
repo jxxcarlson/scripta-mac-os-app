@@ -40,6 +40,7 @@ pub fn terminal_open(
     cwd: String,
     cols: u16,
     rows: u16,
+    init_cmd: String,
 ) -> Result<(), String> {
     // Close any pre-existing session with the same id.
     {
@@ -63,7 +64,12 @@ pub fn terminal_open(
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
-    let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
+    let mut writer = pair.master.take_writer().map_err(|e| e.to_string())?;
+    if !init_cmd.is_empty() {
+        let line = format!("{}\n", init_cmd);
+        writer.write_all(line.as_bytes()).map_err(|e| e.to_string())?;
+        writer.flush().map_err(|e| e.to_string())?;
+    }
 
     let app_for_thread = app.clone();
     let id_for_thread = id.clone();
