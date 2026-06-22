@@ -542,6 +542,7 @@ settingsOverlay model =
             , div [ style "color" "var(--muted)", style "font-size" "12px", style "margin-bottom" "16px" ]
                 [ text "Keys are stored in your macOS Keychain. Only the last 4 characters are shown back." ]
             , activeProviderRow model
+            , agentCommandRow model
             , div [ style "height" "12px" ] []
             , div [] (List.map (providerRow model) AiConfig.providers)
             ]
@@ -841,6 +842,22 @@ activeProviderRow model =
                 )
                 AiConfig.providers
             )
+        ]
+
+
+agentCommandRow : Model -> Html Msg
+agentCommandRow model =
+    div [ style "display" "flex", style "align-items" "center", style "gap" "8px", style "margin-bottom" "8px" ]
+        [ Html.label [ style "font-weight" "600", style "font-size" "13px" ] [ text "Agent command:" ]
+        , Html.input
+            [ Html.Attributes.value (AiConfig.effectiveAgentCommand model.aiConfig)
+            , onInput SetAgentCommand
+            , Html.Attributes.attribute "autocapitalize" "off"
+            , Html.Attributes.attribute "autocorrect" "off"
+            , Html.Attributes.spellcheck False
+            , style "flex" "1"
+            ]
+            []
         ]
 
 
