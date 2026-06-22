@@ -147,7 +147,7 @@ openExternalFile abs model =
 
 
 {-| Open a vault-relative document path in-app, pushing the current document
-onto the history stack (for Back).
+onto the history stack (for Prev/Next).
 -}
 openDoc : String -> Model -> ( Model, Cmd Msg )
 openDoc path model =
@@ -163,7 +163,7 @@ openDoc path model =
     openDocNoPush path { model | history = history, future = [] }
 
 
-{-| Open a vault-relative document path without touching history (used by Back). -}
+{-| Open a vault-relative document path without touching history (used by Prev/Next). -}
 openDocNoPush : String -> Model -> ( Model, Cmd Msg )
 openDocNoPush path model =
     case model.vaultRoot of
