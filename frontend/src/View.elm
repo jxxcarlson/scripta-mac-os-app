@@ -35,11 +35,6 @@ treeColumn model =
             ]
             :: [ searchBox model
                , fileTree model
-               , div [ style "margin-top" "4px", style "display" "flex", style "gap" "2mm" ]
-                    [ button [ onClick ClickedExportHtml ] [ text "Export HTML" ]
-                    , button [ onClick ClickedExportLatex ] [ text "Export LaTeX" ]
-                    , button [ onClick ClickedExportPdf ] [ text "Export PDF" ]
-                    ]
                ]
         )
 
@@ -146,11 +141,12 @@ view model =
                     , Html.Attributes.spellcheck False
                     ]
                     []
+                , div [ style "font-size" "12px", style "color" "var(--muted)" ]
+                    [ text (saveLabel model.saveState.saveStatus) ]
                 , button [ onClick ClickedNewFile ] [ text "New" ]
                 , button [ onClick ClickedRename ] [ text "Rename" ]
                 , button [ onClick ClickedDeleteSelected ] [ text "Delete" ]
-                , div [ style "font-size" "12px", style "color" "var(--muted)" ]
-                    [ text (saveLabel model.saveState.saveStatus) ]
+                , exportDropdown
                 ]
 
         readerView =
@@ -375,6 +371,19 @@ searchBox model =
         , style "margin-top" "8px"
         ]
         []
+
+
+exportDropdown : Html Msg
+exportDropdown =
+    Html.select
+        [ Html.Attributes.value ""
+        , Html.Events.on "change" (D.map ExportSelected Html.Events.targetValue)
+        ]
+        [ Html.option [ Html.Attributes.value "" ] [ text "Export" ]
+        , Html.option [ Html.Attributes.value "html" ] [ text "Export HTML" ]
+        , Html.option [ Html.Attributes.value "latex" ] [ text "Export LaTeX" ]
+        , Html.option [ Html.Attributes.value "pdf" ] [ text "Export PDF" ]
+        ]
 
 
 {-| Tree highlight inputs: the open document (pale-blue pill) and the folder a

@@ -459,6 +459,20 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        ExportSelected v ->
+            case v of
+                "html" ->
+                    update ClickedExportHtml model
+
+                "latex" ->
+                    update ClickedExportLatex model
+
+                "pdf" ->
+                    update ClickedExportPdf model
+
+                _ ->
+                    ( model, Cmd.none )
+
         ToggledFolder path ->
             let
                 folders =

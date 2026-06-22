@@ -101,6 +101,7 @@ type Msg
     | ClickedExportHtml
     | ClickedExportLatex
     | ClickedExportPdf
+    | ExportSelected String
     | GotOpenFile D.Value
     | ToggledFolder String
     | GotOpenFolders D.Value
