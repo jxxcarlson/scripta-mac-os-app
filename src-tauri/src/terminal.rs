@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 use std::sync::Mutex;
 use tauri::Emitter;
 
-struct Session {
+pub(crate) struct Session {
     writer: Box<dyn Write + Send>,
     master: Box<dyn portable_pty::MasterPty + Send>,
     child: Box<dyn portable_pty::Child + Send + Sync>,
