@@ -884,23 +884,55 @@ subscriptions _ =
         ]
 
 
-{-| Cmd+[ -> Prev, Cmd+] -> Next. Fails (no message) for anything else, so it
-does not interfere with normal typing. The update handlers no-op when the
-relevant nav stack is empty.
+{-| App keyboard shortcuts. Letters are matched on physical `code` (KeyB, …) so
+they survive Option producing special characters (Option-R types "®") and any
+keyboard layout. Fails (no message) for anything else, so normal typing is
+untouched. `index.html` separately preventDefaults these combos so they don't
+insert text / transpose / reload the webview.
+
+  Cmd+[ Prev · Cmd+] Next · Cmd+B Both · Cmd+E Editor · Ctrl+R Reader ·
+  Cmd+N New · Opt+R Reload · Cmd+T Terminal · Ctrl+T TOC
+
 -}
 navKeyDecoder : D.Decoder Msg
 navKeyDecoder =
-    D.map2 Tuple.pair (D.field "metaKey" D.bool) (D.field "key" D.string)
+    D.map5 (\meta ctrl alt key code -> { meta = meta, ctrl = ctrl, alt = alt, key = key, code = code })
+        (D.field "metaKey" D.bool)
+        (D.field "ctrlKey" D.bool)
+        (D.field "altKey" D.bool)
+        (D.field "key" D.string)
+        (D.field "code" D.string)
         |> D.andThen
-            (\( meta, key ) ->
-                if meta && key == "[" then
+            (\k ->
+                if k.meta && k.key == "[" then
                     D.succeed ClickedPrev
 
-                else if meta && key == "]" then
+                else if k.meta && k.key == "]" then
                     D.succeed ClickedNext
 
+                else if k.meta && k.code == "KeyB" then
+                    D.succeed (SetViewMode "both")
+
+                else if k.meta && k.code == "KeyE" then
+                    D.succeed (SetViewMode "editor")
+
+                else if k.meta && k.code == "KeyN" then
+                    D.succeed ClickedNewFile
+
+                else if k.meta && k.code == "KeyT" then
+                    D.succeed ToggledTerminal
+
+                else if k.ctrl && k.code == "KeyR" then
+                    D.succeed (SetViewMode "reader")
+
+                else if k.ctrl && k.code == "KeyT" then
+                    D.succeed ToggledToc
+
+                else if k.alt && k.code == "KeyR" then
+                    D.succeed ClickedReload
+
                 else
-                    D.fail "not a nav shortcut"
+                    D.fail "not a shortcut"
             )
 
 

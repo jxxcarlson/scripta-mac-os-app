@@ -467,6 +467,20 @@
       };
       const app = Elm.Main.init({ node: document.getElementById('app'), flags: flags });
 
+      // App keyboard shortcuts are dispatched by Elm (Browser.Events.onKeyDown).
+      // Here we only preventDefault those combos so the webview doesn't act on
+      // them: Option-R would insert "®", Ctrl-T is macOS transpose, Cmd-R would
+      // reload the webview (reload is now Option-R), and Cmd-[ / Cmd-] are
+      // webview history back/forward.
+      document.addEventListener('keydown', function (e) {
+        var c = e.code;
+        var hit =
+          (e.metaKey && (c === 'KeyB' || c === 'KeyE' || c === 'KeyN' || c === 'KeyT' || c === 'KeyR' || e.key === '[' || e.key === ']')) ||
+          (e.ctrlKey && (c === 'KeyR' || c === 'KeyT')) ||
+          (e.altKey && c === 'KeyR');
+        if (hit) e.preventDefault();
+      });
+
       // Port guards: Elm dead-code-eliminates an unused port, so app.ports[name]
       // can be undefined. Calling .subscribe/.send on it would throw and abort the
       // rest of this boot script (which silently disabled features once before).
