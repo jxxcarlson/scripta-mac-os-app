@@ -369,7 +369,11 @@
         function applyEditorSplit(px, persist) {
           var ed = document.querySelector('codemirror-editor');
           var left = ed ? ed.getBoundingClientRect().left : 0;
-          var maxW = Math.max(200, window.innerWidth - left - 360);
+          // Right-stop only: the editor may grow until the rendered column is
+          // squeezed to RENDER_MIN, no further. Leftward it's free down to a
+          // small floor. There is no fixed editor max-width (see View.elm).
+          var RENDER_MIN = 360;
+          var maxW = Math.max(200, window.innerWidth - left - RENDER_MIN);
           var w = Math.max(200, Math.min(maxW, px));
           document.documentElement.style.setProperty('--editor-split', w + 'px');
           if (persist) { try { localStorage.setItem('editorSplit', w); } catch (e) {} }

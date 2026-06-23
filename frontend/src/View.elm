@@ -508,10 +508,14 @@ contentRow model ( bodyHtml, tocHtml ) =
                 || (model.viewMode == ViewEditor && showToc)
 
         editorSized =
+            -- Width is driven entirely by --editor-split (set by the drag
+            -- handler in index.html). No CSS max-width: the only bound on the
+            -- divider is the JS right-stop, which reserves a minimum for the
+            -- rendered column. So the divider is free to move left and is
+            -- stopped only on the right.
             [ style "flex" "0 0 auto"
             , style "width" "var(--editor-split, 50%)"
             , style "min-width" "0"
-            , style "max-width" "700px"
             , style "border-right" "1px solid var(--border)"
             ]
 
