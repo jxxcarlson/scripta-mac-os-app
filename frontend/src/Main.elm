@@ -231,6 +231,9 @@ update msg model =
         ClickedTreeNode path ->
             openDoc path model
 
+        ClickedSubjectsIndex ->
+            openDoc "Subjects/_index.md" model
+
         NoOpFromRender ->
             ( model, Cmd.none )
 
@@ -891,7 +894,7 @@ untouched. `index.html` separately preventDefaults these combos so they don't
 insert text / transpose / reload the webview.
 
   Cmd+[ Prev · Cmd+] Next · Cmd+B Both · Cmd+E Editor · Ctrl+R Reader ·
-  Cmd+N New · Opt+R Reload · Cmd+T Terminal · Ctrl+T TOC
+  Cmd+N New · Cmd+I Subjects index · Opt+R Reload · Cmd+T Terminal · Ctrl+T TOC
 
 -}
 navKeyDecoder : D.Decoder Msg
@@ -918,6 +921,9 @@ navKeyDecoder =
 
                 else if k.meta && k.code == "KeyN" then
                     D.succeed ClickedNewFile
+
+                else if k.meta && k.code == "KeyI" then
+                    D.succeed ClickedSubjectsIndex
 
                 else if k.meta && k.code == "KeyT" then
                     D.succeed ToggledTerminal

@@ -114,6 +114,7 @@ type Msg
     | GotSaveResult Int
     | SetNewName String
     | ClickedNewFile
+    | ClickedSubjectsIndex
     | ClickedDeleteSelected
     | ClickedChangeVault
     | ClickedRename
