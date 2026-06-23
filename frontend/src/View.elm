@@ -14,6 +14,7 @@ import MarkdownRender
 import PathUtil
 import Render
 import SaveState
+import Scripta.Document
 import Set exposing (Set)
 import Svg
 import Svg.Attributes as SA
@@ -105,6 +106,7 @@ view model =
                                 "Show Terminal"
                             )
                         ]
+                    , docTitleLabel model
                     ]
                 , toolbarRow
                     [ Html.input
@@ -487,6 +489,69 @@ groupSep =
         , style "margin" "0 4px"
         ]
         []
+
+
+{-| `<parent>:<title>` for the current document, shown in the toolbar. `parent`
+is the name of the containing folder (or the vault folder for a root-level
+file); `title` is the Scripta `title` block when present, otherwise the file
+name without its extension. Renders nothing when no document is selected.
+-}
+docTitleLabel : Model -> Html Msg
+docTitleLabel model =
+    case model.selectedPath of
+        Nothing ->
+            text ""
+
+        Just path ->
+            let
+                parent =
+                    case PathUtil.basename (PathUtil.parentDir path) of
+                        "" ->
+                            model.vaultRoot |> Maybe.map PathUtil.basename |> Maybe.withDefault ""
+
+                        name ->
+                            name
+
+                fileTitle =
+                    stripExtension (PathUtil.basename path)
+
+                docTitle =
+                    case model.parsedDoc of
+                        Just doc ->
+                            case String.trim (Scripta.Document.title doc) of
+                                "" ->
+                                    fileTitle
+
+                                t ->
+                                    t
+
+                        Nothing ->
+                            fileTitle
+            in
+            div
+                [ style "margin-left" "12px"
+                , style "color" "var(--muted)"
+                , style "font-size" "13px"
+                , style "white-space" "nowrap"
+                , style "overflow" "hidden"
+                , style "text-overflow" "ellipsis"
+                ]
+                [ text (parent ++ ":" ++ docTitle) ]
+
+
+{-| Drop a trailing `.ext` from a file name, leaving names without a dot (and
+the leading dot of a dotfile) intact. -}
+stripExtension : String -> String
+stripExtension name =
+    case String.split "." name of
+        [] ->
+            name
+
+        [ single ] ->
+            single
+
+        parts ->
+            parts |> List.reverse |> List.drop 1 |> List.reverse |> String.join "."
 
 
 {-| The content area below the toolbar: tree (when shown), the editor (ALWAYS
