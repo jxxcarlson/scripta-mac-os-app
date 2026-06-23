@@ -248,14 +248,27 @@
           this._id = id;
           this._cwd = cwd;
           this._opened = false;
-          term.onData(function (d) { invoke('terminal_input', { id: id, data: d }).catch(function () {}); });
+          this._exited = false;
+          this._lastOpenAt = 0;
+          this._rapidFailures = 0;
+          this._restartTimer = null;
+          const self = this;
+          term.onData(function (d) {
+            // While the process is gone, swallow keystrokes (the pty is dead, so
+            // they'd vanish anyway). Once auto-restart has given up, Enter starts
+            // a fresh session.
+            if (self._exited) {
+              if (d === '\r' || d === '\n') { self._rapidFailures = 0; self._restart(); }
+              return;
+            }
+            invoke('terminal_input', { id: id, data: d }).catch(function () {});
+          });
           this._unlistenOut = listen('terminal-output', function (e) {
             if (e.payload && e.payload.id === id) term.write(b64ToBytes(e.payload.data));
           });
           this._unlistenExit = listen('terminal-exit', function (e) {
-            if (e.payload && e.payload.id === id) term.write('\r\n[process exited]\r\n');
+            if (e.payload && e.payload.id === id) self._onExit();
           });
-          const self = this;
           this._ro = new ResizeObserver(function () { self._openOrResize(); });
           this._ro.observe(this);
           // Open the pty lazily — only once the pane is visible and fitted to its
@@ -270,12 +283,38 @@
           if (this._term.cols <= 0 || this._term.rows <= 0) return;
           if (!this._opened) {
             this._opened = true;
+            this._exited = false;
+            this._lastOpenAt = Date.now();
             invoke('terminal_open', { id: this._id, cwd: this._cwd, cols: this._term.cols, rows: this._term.rows, initCmd: this.getAttribute('init-cmd') || '' }).catch(function () {});
           } else {
             invoke('terminal_resize', { id: this._id, cols: this._term.cols, rows: this._term.rows }).catch(function () {});
           }
         }
+        // The pty's process exited. Auto-restart it in place (respawning the
+        // shell and re-running the tab's startup command). Guard against a tight
+        // loop: a process that dies within a few seconds of starting is likely
+        // failing to launch, so after a few such rapid failures we stop and let
+        // the user restart manually with Enter.
+        _onExit() {
+          this._exited = true;
+          var ranMs = this._lastOpenAt ? (Date.now() - this._lastOpenAt) : 0;
+          if (ranMs < 3000) { this._rapidFailures++; } else { this._rapidFailures = 0; }
+          if (this._rapidFailures >= 3) {
+            this._term.write('\r\n[process exited repeatedly — press ⏎ to restart]\r\n');
+            return;
+          }
+          this._term.write('\r\n[process exited — restarting…]\r\n');
+          var self = this;
+          this._restartTimer = setTimeout(function () { self._restart(); }, 800);
+        }
+        _restart() {
+          if (this._restartTimer) { clearTimeout(this._restartTimer); this._restartTimer = null; }
+          this._opened = false;   // force _openOrResize to spawn a fresh pty
+          this._exited = false;
+          this._openOrResize();
+        }
         disconnectedCallback() {
+          if (this._restartTimer) { clearTimeout(this._restartTimer); this._restartTimer = null; }
           if (this._ro) this._ro.disconnect();
           if (this._unlistenOut) this._unlistenOut.then(function (f) { f(); });
           if (this._unlistenExit) this._unlistenExit.then(function (f) { f(); });
