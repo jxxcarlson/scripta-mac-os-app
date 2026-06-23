@@ -170,19 +170,59 @@ openDocNoPush : String -> Model -> ( Model, Cmd Msg )
 openDocNoPush path model =
     case model.vaultRoot of
         Just root ->
-            if Language.fromPath path == Just Language.Image then
-                request (PReadImage path)
-                    "read_image"
-                    [ ( "root", E.string root ), ( "path", E.string path ) ]
-                    { model | selectedPath = Just path, language = Just Language.Image }
+            let
+                ( flushed, flushCmd ) =
+                    flushPendingSave path model
 
-            else
-                request (PReadFile path)
-                    "read_file"
-                    [ ( "root", E.string root ), ( "path", E.string path ) ]
-                    { model | selectedPath = Just path, language = Language.fromPath path, imageSrc = Nothing }
+                ( m2, readCmd ) =
+                    if Language.fromPath path == Just Language.Image then
+                        request (PReadImage path)
+                            "read_image"
+                            [ ( "root", E.string root ), ( "path", E.string path ) ]
+                            { flushed | selectedPath = Just path, language = Just Language.Image }
+
+                    else
+                        request (PReadFile path)
+                            "read_file"
+                            [ ( "root", E.string root ), ( "path", E.string path ) ]
+                            { flushed | selectedPath = Just path, language = Language.fromPath path, imageSrc = Nothing }
+            in
+            ( m2, Cmd.batch [ flushCmd, readCmd ] )
 
         Nothing ->
+            ( model, Cmd.none )
+
+
+{-| Before switching to a *different* document, persist any unsaved edits to the
+document we're leaving and reset the save state. Without this, a pending autosave
+debounce (scheduled while editing the old doc) would fire after `selectedPath`
+has moved to the new doc and write the old content into the new file — so a
+freshly created file would come up holding the previous document's text. The
+flush write is fire-and-forget (`PNoop`): we're leaving the old doc, so its
+post-write mtime no longer matters this session.
+-}
+flushPendingSave : String -> Model -> ( Model, Cmd Msg )
+flushPendingSave path model =
+    case ( model.vaultRoot, model.selectedPath ) of
+        ( Just root, Just current ) ->
+            if current == path then
+                ( model, Cmd.none )
+
+            else
+                let
+                    cleared =
+                        { model | saveState = SaveState.init }
+                in
+                if model.saveState.hasUnsavedContent then
+                    request PNoop
+                        "write_file"
+                        [ ( "root", E.string root ), ( "path", E.string current ), ( "content", E.string model.content ) ]
+                        cleared
+
+                else
+                    ( cleared, Cmd.none )
+
+        _ ->
             ( model, Cmd.none )
 
 
