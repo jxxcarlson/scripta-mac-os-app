@@ -519,7 +519,11 @@ contentRow model ( bodyHtml, tocHtml ) =
             , style "border-right" "1px solid var(--border)"
             ]
 
-        editorStyles =
+        -- Sizing lives on a wrapper div, NOT on the codemirror-editor element:
+        -- the custom element imperatively sets its own width/height to 100% in
+        -- connectedCallback, which would clobber any width we put here. The
+        -- editor fills the wrapper; the wrapper carries the flex sizing.
+        editorWrapperStyles =
             case model.viewMode of
                 ViewReader ->
                     [ style "display" "none" ]
@@ -543,14 +547,14 @@ contentRow model ( bodyHtml, tocHtml ) =
 
         editorKeyed =
             ( "editor"
-            , Html.node "codemirror-editor"
-                ([ Html.Attributes.attribute "text" model.loadedContent
-                 , Html.Attributes.attribute "fill-parent" ""
-                 , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
-                 ]
-                    ++ editorStyles
-                )
-                []
+            , div editorWrapperStyles
+                [ Html.node "codemirror-editor"
+                    [ Html.Attributes.attribute "text" model.loadedContent
+                    , Html.Attributes.attribute "fill-parent" ""
+                    , Html.Events.on "text-change" (D.map EditorChanged Editor.textChangeDecoder)
+                    ]
+                    []
+                ]
             )
 
         editorHandleKeyed =
