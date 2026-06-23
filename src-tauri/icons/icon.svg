@@ -4,6 +4,6 @@
   </defs>
   <rect x="2" y="2" width="96" height="96" rx="22" fill="#d6e8fb"/>
   <g clip-path="url(#r)">
-    <text x="50" y="50" text-anchor="middle" dominant-baseline="central" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="64" fill="#1d3a8a">K</text>
+    <text x="50" y="73" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="64" fill="#1d3a8a">K</text>
   </g>
 </svg>
