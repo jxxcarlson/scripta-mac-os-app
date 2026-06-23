@@ -54,6 +54,12 @@ themeName isLight =
 view : Model -> Html Msg
 view model =
     let
+        rendered =
+            renderedAndToc model
+
+        tocHtml =
+            Tuple.second rendered
+
         toolbar =
             div [ style "border-bottom" "1px solid var(--border)" ]
                 [ toolbarRow
@@ -78,7 +84,10 @@ view model =
                             )
                         ]
                     , viewModeDropdown model
-                    , button [ onClick ToggledToc ]
+                    , button
+                        [ onClick ToggledToc
+                        , Html.Attributes.disabled (List.isEmpty tocHtml)
+                        ]
                         [ text
                             (if model.tocVisible then
                                 "Hide TOC"
@@ -144,7 +153,7 @@ view model =
                 imageView model
 
             else
-                contentRow model
+                contentRow model rendered
     in
     div
         [ Html.Attributes.attribute "data-theme" (themeName model.isLight)
@@ -485,12 +494,9 @@ mounted; hidden in Reader mode so CodeMirror keeps its live doc across mode
 switches), and the rendered text + TOC (in Both/Reader). One Html.Keyed row so
 Elm never recreates the editor when siblings appear/disappear.
 -}
-contentRow : Model -> Html Msg
-contentRow model =
+contentRow : Model -> ( List (Html Msg), List (Html Msg) ) -> Html Msg
+contentRow model ( bodyHtml, tocHtml ) =
     let
-        ( bodyHtml, tocHtml ) =
-            renderedAndToc model
-
         showRender =
             model.viewMode == ViewBoth || model.viewMode == ViewReader
 

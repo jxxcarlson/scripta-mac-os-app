@@ -459,7 +459,6 @@
       try { lastVault = await invoke('get_last_vault'); } catch (e) { lastVault = null; }
       const flags = {
         lastVault: lastVault,                        // string | null (from Rust)
-        readerMode: lsGet('readerMode') === 'true',  // bool
         fullParse: lsGet('fullParse') !== 'false',   // bool (unset → Full)
         isLight: lsGet('isLight') !== 'false',       // bool (unset → Light)
         aiConfig: JSON.parse(lsGet('aiConfig') || 'null'),   // object | null
@@ -516,9 +515,6 @@
         sendPort('gotOpenFolders', folders);
       });
 
-      subscribePort('saveReaderMode', (on) => {
-        try { localStorage.setItem('readerMode', on ? 'true' : 'false'); } catch (e) {}
-      });
       subscribePort('saveFullParse', (on) => {
         try { localStorage.setItem('fullParse', on ? 'true' : 'false'); } catch (e) {}
       });

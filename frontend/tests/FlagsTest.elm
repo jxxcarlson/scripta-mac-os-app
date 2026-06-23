@@ -14,43 +14,36 @@ suite =
             \_ ->
                 let
                     v =
-                        E.object [ ( "lastVault", E.string "/Users/me/vault" ), ( "readerMode", E.bool True ) ]
+                        E.object [ ( "lastVault", E.string "/Users/me/vault" ) ]
 
                     f =
                         Flags.decode v
                 in
-                Expect.equal ( Just "/Users/me/vault", True ) ( f.lastVault, f.readerMode )
+                Expect.equal (Just "/Users/me/vault") f.lastVault
         , test "missing lastVault decodes to Nothing" <|
             \_ ->
                 let
                     f =
-                        Flags.decode (E.object [ ( "readerMode", E.bool False ) ])
+                        Flags.decode (E.object [])
                 in
                 Expect.equal Nothing f.lastVault
         , test "null lastVault decodes to Nothing" <|
             \_ ->
                 let
                     f =
-                        Flags.decode (E.object [ ( "lastVault", E.null ), ( "readerMode", E.bool False ) ])
+                        Flags.decode (E.object [ ( "lastVault", E.null ) ])
                 in
                 Expect.equal Nothing f.lastVault
-        , test "missing/garbage readerMode defaults to False" <|
-            \_ ->
-                let
-                    f =
-                        Flags.decode (E.object [ ( "readerMode", E.string "yes" ) ])
-                in
-                Expect.equal False f.readerMode
         , test "a non-object value yields defaults" <|
             \_ ->
                 let
                     f =
                         Flags.decode (E.int 5)
                 in
-                Expect.equal ( Nothing, False ) ( f.lastVault, f.readerMode )
+                Expect.equal Nothing f.lastVault
         , test "missing fullParse defaults to True" <|
             \_ ->
-                Expect.equal True (Flags.decode (E.object [ ( "readerMode", E.bool False ) ])).fullParse
+                Expect.equal True (Flags.decode (E.object [])).fullParse
         , test "fullParse false decodes to False" <|
             \_ ->
                 Expect.equal False (Flags.decode (E.object [ ( "fullParse", E.bool False ) ])).fullParse
@@ -59,7 +52,7 @@ suite =
                 Expect.equal True (Flags.decode (E.object [ ( "fullParse", E.bool True ) ])).fullParse
         , test "missing isLight defaults to True" <|
             \_ ->
-                Expect.equal True (Flags.decode (E.object [ ( "readerMode", E.bool False ) ])).isLight
+                Expect.equal True (Flags.decode (E.object [])).isLight
         , test "isLight false decodes to False" <|
             \_ ->
                 Expect.equal False (Flags.decode (E.object [ ( "isLight", E.bool False ) ])).isLight

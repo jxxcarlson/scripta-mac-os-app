@@ -3,7 +3,7 @@ port module FileOps exposing
     , fsRequest, fsResponse, fileChanged, openFile
     , scrollAndHighlight, copyToClipboard
     , saveOpenFolders, requestOpenFolders, gotOpenFolders
-    , saveReaderMode, saveLastVault, saveFullParse, saveIsLight, saveAiConfig, saveTerminalVisible
+    , saveLastVault, saveFullParse, saveIsLight, saveAiConfig, saveTerminalVisible
     , encodeRequest, responseDecoder, resultOf
     , send
     )
@@ -36,9 +36,6 @@ port requestOpenFolders : String -> Cmd msg
 
 
 port gotOpenFolders : (E.Value -> msg) -> Sub msg
-
-
-port saveReaderMode : Bool -> Cmd msg
 
 
 port saveLastVault : String -> Cmd msg
