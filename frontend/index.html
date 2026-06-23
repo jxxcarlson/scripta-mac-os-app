@@ -369,20 +369,23 @@
         function applyEditorSplit(px, persist) {
           var ed = document.querySelector('codemirror-editor');
           var left = ed ? ed.getBoundingClientRect().left : 0;
-          var maxW = Math.max(200, window.innerWidth - left - 200);
+          var maxW = Math.max(200, window.innerWidth - left - 360);
           var w = Math.max(200, Math.min(maxW, px));
           document.documentElement.style.setProperty('--editor-split', w + 'px');
           if (persist) { try { localStorage.setItem('editorSplit', w); } catch (e) {} }
           return w;
         }
         var saved = parseInt(lsGet('editorSplit'), 10);
-        if (!isNaN(saved)) applyEditorSplit(saved, true);
+        if (!isNaN(saved)) requestAnimationFrame(function () { applyEditorSplit(saved, true); });
         var dragging = false;
         document.addEventListener('pointerdown', function (e) {
           if (e.target && e.target.id === 'editor-split-handle') {
             var ed = document.querySelector('codemirror-editor');
             editorLeft = ed ? ed.getBoundingClientRect().left : 0;
             dragging = true;
+            // Capture the pointer to the handle so CodeMirror (to the left) can't
+            // steal pointermove and start a text selection when dragging over it.
+            if (e.target.setPointerCapture) { try { e.target.setPointerCapture(e.pointerId); } catch (_) {} }
             e.preventDefault();
           }
         });
@@ -414,7 +417,7 @@
           return w;
         }
         var saved = parseInt(lsGet('renderTocSplit'), 10);
-        if (!isNaN(saved)) applyRenderTocSplit(saved, true);
+        if (!isNaN(saved)) requestAnimationFrame(function () { applyRenderTocSplit(saved, true); });
         var dragging = false;
         document.addEventListener('pointerdown', function (e) {
           if (e.target && e.target.id === 'toc-split-handle') {

@@ -495,7 +495,19 @@ contentRow model =
             model.viewMode == ViewBoth || model.viewMode == ViewReader
 
         showToc =
-            showRender && model.tocVisible && not (List.isEmpty tocHtml)
+            model.tocVisible && not (List.isEmpty tocHtml)
+
+        showEdHandle =
+            (model.viewMode == ViewBoth)
+                || (model.viewMode == ViewEditor && showToc)
+
+        editorSized =
+            [ style "flex" "0 0 auto"
+            , style "width" "var(--editor-split, 50%)"
+            , style "min-width" "0"
+            , style "max-width" "700px"
+            , style "border-right" "1px solid var(--border)"
+            ]
 
         editorStyles =
             case model.viewMode of
@@ -503,14 +515,14 @@ contentRow model =
                     [ style "display" "none" ]
 
                 ViewBoth ->
-                    [ style "flex" "0 1 auto"
-                    , style "width" "var(--editor-split, 50%)"
-                    , style "min-width" "0"
-                    , style "border-right" "1px solid var(--border)"
-                    ]
+                    editorSized
 
                 ViewEditor ->
-                    [ style "flex" "1" ]
+                    if showToc then
+                        editorSized
+
+                    else
+                        [ style "flex" "1 1 auto", style "min-width" "0" ]
 
         treeKeyed =
             if model.treeVisible then
@@ -532,7 +544,7 @@ contentRow model =
             )
 
         editorHandleKeyed =
-            if model.viewMode == ViewBoth then
+            if showEdHandle then
                 [ ( "ed-handle"
                   , div
                         [ Html.Attributes.id "editor-split-handle"
@@ -570,8 +582,8 @@ contentRow model =
             else
                 []
 
-        tocKeyed =
-            if showToc then
+        tocHandleKeyed =
+            if showRender && showToc then
                 [ ( "toc-handle"
                   , div
                         [ Html.Attributes.id "toc-split-handle"
@@ -582,7 +594,14 @@ contentRow model =
                         ]
                         []
                   )
-                , ( "toc"
+                ]
+
+            else
+                []
+
+        tocKeyed =
+            if showToc then
+                [ ( "toc"
                   , div
                         [ style "flex" "1"
                         , style "border-left" "1px solid var(--border)"
@@ -598,7 +617,13 @@ contentRow model =
     in
     Html.Keyed.node "div"
         [ style "display" "flex", style "flex" "1", style "min-height" "0" ]
-        (treeKeyed ++ [ editorKeyed ] ++ editorHandleKeyed ++ renderKeyed ++ tocKeyed)
+        (treeKeyed
+            ++ [ editorKeyed ]
+            ++ editorHandleKeyed
+            ++ renderKeyed
+            ++ tocHandleKeyed
+            ++ tocKeyed
+        )
 
 
 {-| Full-width view for image documents: tree column + image pane.
