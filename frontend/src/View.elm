@@ -530,7 +530,7 @@ docTitleLabel model =
             in
             div
                 [ style "margin-left" "12px"
-                , style "color" "var(--muted)"
+                , style "color" "var(--doc-label)"
                 , style "font-size" "13px"
                 , style "white-space" "nowrap"
                 , style "overflow" "hidden"
@@ -743,7 +743,7 @@ renderedAndToc model =
         ( Just Language.Markdown, _ ) ->
             let
                 out =
-                    MarkdownRender.render model.content
+                    MarkdownRender.render (String.trimLeft model.content)
             in
             ( out.body |> List.map (Html.map GotRenderMsg)
             , out.toc |> List.map (Html.map GotRenderMsg)
@@ -765,7 +765,7 @@ previewBody model =
                 |> List.map (Html.map (\_ -> NoOpFromRender))
 
         ( Just Language.Markdown, _ ) ->
-            MarkdownRender.render model.content
+            MarkdownRender.render (String.trimLeft model.content)
                 |> .body
                 |> List.map (Html.map GotRenderMsg)
 

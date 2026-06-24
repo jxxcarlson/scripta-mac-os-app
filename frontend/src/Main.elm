@@ -16,7 +16,6 @@ import OpenFolders
 import Process
 import Render
 import SaveState
-import Scripta
 import Set
 import Task
 import PathUtil
@@ -364,7 +363,7 @@ update msg model =
                             Just (Render.parse model.isLight model.contentWidth newText)
 
                         else
-                            Maybe.map (\d -> Scripta.reparse (Render.options model.isLight model.contentWidth) d newText) model.parsedDoc
+                            Maybe.map (\d -> Render.reparse model.isLight model.contentWidth d newText) model.parsedDoc
 
                     else
                         model.parsedDoc
