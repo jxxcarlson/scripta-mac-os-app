@@ -524,6 +524,22 @@
         if (hit) e.preventDefault();
       });
 
+      // Open external links in the system browser. Rendered documents emit plain
+      // <a href="https://…" target="_blank"> anchors (no Elm click event); inside
+      // a webview those clicks do nothing. Intercept clicks on http(s)/mailto
+      // anchors and hand the URL to the OS via the open_url command. Fragment
+      // links (href="#id", in-document navigation) and everything else are left
+      // for Elm / the browser to handle.
+      document.addEventListener('click', function (e) {
+        var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+        if (!a) return;
+        var href = a.getAttribute('href') || '';
+        if (/^(https?:\/\/|mailto:)/i.test(href)) {
+          e.preventDefault();
+          invoke('open_url', { url: href }).catch(function () {});
+        }
+      });
+
       // Port guards: Elm dead-code-eliminates an unused port, so app.ports[name]
       // can be undefined. Calling .subscribe/.send on it would throw and abort the
       // rest of this boot script (which silently disabled features once before).
