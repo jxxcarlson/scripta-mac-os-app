@@ -335,12 +335,21 @@ fileTree model =
                     |> Maybe.map PathUtil.parentDir
                     |> Maybe.withDefault ""
             }
+
+        -- When compact-index mode is on, hide the _index-compact.md files: they
+        -- are opened via their _index.md node, not navigated to directly.
+        nodes =
+            if model.indexCompact then
+                Workspace.hideCompactIndex model.tree
+
+            else
+                model.tree
     in
     if String.isEmpty q then
-        treeView False highlights model.openFolders model.tree
+        treeView False highlights model.openFolders nodes
 
     else
-        treeView True highlights model.openFolders (Workspace.filter q model.tree)
+        treeView True highlights model.openFolders (Workspace.filter q nodes)
 
 
 treeView : Bool -> Highlights -> Set String -> List Node -> Html Msg

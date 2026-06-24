@@ -67,6 +67,7 @@ init flagsValue =
         , viewMode = ViewBoth
         , treeVisible = True
         , tocVisible = False
+        , indexCompact = True
         , fullParse = flags.fullParse
         , initialLastVault = flags.lastVault
         , aiConfig = flags.aiConfig
@@ -162,6 +163,31 @@ openDoc path model =
                     model.history
     in
     openDocNoPush path { model | history = history, future = [] }
+
+
+{-| Open an `_index.md` document. Honors `indexCompact`: when it's on and a
+sibling `_index-compact.md` exists, that compact version is opened in its place.
+Index documents always open in Reader mode.
+-}
+openIndexDoc : String -> Model -> ( Model, Cmd Msg )
+openIndexDoc path model =
+    let
+        compactPath =
+            case PathUtil.parentDir path of
+                "" ->
+                    "_index-compact.md"
+
+                dir ->
+                    dir ++ "/_index-compact.md"
+
+        target =
+            if model.indexCompact && Workspace.hasFile compactPath model.tree then
+                compactPath
+
+            else
+                path
+    in
+    openDoc target { model | viewMode = ViewReader }
 
 
 {-| Open a vault-relative document path without touching history (used by Prev/Next). -}
@@ -268,10 +294,14 @@ update msg model =
             request PPickWorkspace "pick_workspace" [] model
 
         ClickedTreeNode path ->
-            openDoc path model
+            if PathUtil.basename path == "_index.md" then
+                openIndexDoc path model
+
+            else
+                openDoc path model
 
         ClickedSubjectsIndex ->
-            openDoc "Subjects/_index.md" model
+            openIndexDoc "Subjects/_index.md" model
 
         NoOpFromRender ->
             ( model, Cmd.none )
@@ -616,6 +646,9 @@ update msg model =
         ToggledToc ->
             ( { model | tocVisible = not model.tocVisible }, Cmd.none )
 
+        ToggleIndexCompact ->
+            ( { model | indexCompact = not model.indexCompact }, Cmd.none )
+
         ToggledSettings ->
             ( { model | showSettings = not model.showSettings }, Cmd.none )
 
@@ -939,7 +972,7 @@ insert text / transpose / reload the webview.
 
   Cmd+[ Prev · Cmd+] Next · Cmd+B Both · Cmd+E Editor · Ctrl+R Reader ·
   Cmd+N New · Cmd+I Subjects index · Opt+R Reload · Cmd+T Terminal · Ctrl+T TOC ·
-  Cmd+1 Shell 1 · Cmd+2 Shell 2 · Cmd+3 Scratch
+  Cmd+M toggle compact index · Cmd+1 Shell 1 · Cmd+2 Shell 2 · Cmd+3 Scratch
 
 -}
 navKeyDecoder : D.Decoder Msg
@@ -972,6 +1005,9 @@ navKeyDecoder =
 
                 else if k.meta && k.code == "KeyT" then
                     D.succeed ToggledTerminal
+
+                else if k.meta && k.code == "KeyM" then
+                    D.succeed ToggleIndexCompact
 
                 else if k.ctrl && k.code == "KeyR" then
                     D.succeed (SetViewMode "reader")

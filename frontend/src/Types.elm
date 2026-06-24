@@ -37,6 +37,7 @@ type alias Model =
     , viewMode : ViewMode
     , treeVisible : Bool
     , tocVisible : Bool
+    , indexCompact : Bool
     , fullParse : Bool
     , initialLastVault : Maybe String
     , aiConfig : AiConfig.AiConfig
@@ -136,6 +137,7 @@ type Msg
     | ToggledSettings
     | ToggledTree
     | ToggledToc
+    | ToggleIndexCompact
     | SetActiveProvider String
     | SetProviderModel String String
     | SetAgentCommand String

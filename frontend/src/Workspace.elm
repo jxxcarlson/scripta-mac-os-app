@@ -2,6 +2,7 @@ module Workspace exposing
     ( Entry, Node(..)
     , entryDecoder, toTree, filter
     , nodeName, nodePath, folderChildren, splitIndexFile
+    , hasFile, hideCompactIndex
     )
 
 {-| Workspace (vault) file tree. The Rust shell sends a flat list of `Entry`;
@@ -102,6 +103,45 @@ filterNode q node =
 
                 kept ->
                     Just (FolderNode { r | children = kept })
+
+
+{-| True if any file node anywhere in the forest has exactly this path. Used to
+check whether a sibling `_index-compact.md` exists.
+-}
+hasFile : String -> List Node -> Bool
+hasFile path nodes =
+    List.any
+        (\node ->
+            case node of
+                FileNode r ->
+                    r.path == path
+
+                FolderNode r ->
+                    hasFile path r.children
+        )
+        nodes
+
+
+{-| Drop file nodes named `_index-compact.md` from the forest. Used to hide the
+compact index files from the tree when `indexCompact` is on (they're substitutes
+opened via the `_index.md` node, not navigated to directly).
+-}
+hideCompactIndex : List Node -> List Node
+hideCompactIndex nodes =
+    List.filterMap
+        (\node ->
+            case node of
+                FileNode r ->
+                    if r.name == "_index-compact.md" then
+                        Nothing
+
+                    else
+                        Just node
+
+                FolderNode r ->
+                    Just (FolderNode { r | children = hideCompactIndex r.children })
+        )
+        nodes
 
 
 nodeName : Node -> String
