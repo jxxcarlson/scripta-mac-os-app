@@ -1113,6 +1113,11 @@ terminalPane termId model =
                             -- vault path is unsupported (out of scope).
                             "cd '" ++ root ++ "' && " ++ AiConfig.effectiveAgentCommand model.aiConfig
 
+                        ( "shell2", Just root ) ->
+                            -- Land in the vault on startup. Explicit cd (not just
+                            -- the cwd) so login-file `cd`s don't leave us in $HOME.
+                            "cd '" ++ root ++ "'"
+
                         _ ->
                             ""
             in
