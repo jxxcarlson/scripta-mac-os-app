@@ -528,7 +528,7 @@
       document.addEventListener('keydown', function (e) {
         var c = e.code;
         var hit =
-          (e.metaKey && (c === 'KeyB' || c === 'KeyE' || c === 'KeyN' || c === 'KeyI' || c === 'KeyT' || c === 'KeyR' || e.key === '[' || e.key === ']')) ||
+          (e.metaKey && (c === 'KeyB' || c === 'KeyE' || c === 'KeyN' || c === 'KeyI' || c === 'KeyT' || c === 'KeyR' || c === 'Digit1' || c === 'Digit2' || c === 'Digit3' || e.key === '[' || e.key === ']')) ||
           (e.ctrlKey && (c === 'KeyR' || c === 'KeyT')) ||
           (e.altKey && c === 'KeyR');
         if (hit) e.preventDefault();

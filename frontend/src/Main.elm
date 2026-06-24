@@ -553,7 +553,12 @@ update msg model =
             )
 
         SelectTerminalTab tab ->
-            ( { model | terminalTab = tab }, Cmd.none )
+            -- Also reveal the dock: the Cmd-1/2/3 shortcuts "go to" a tab even
+            -- when the terminal is hidden. (Tab-bar clicks only happen while it's
+            -- already visible, so this is a no-op for them.)
+            ( { model | terminalTab = tab, terminalVisible = True, terminalEverOpened = True }
+            , FileOps.saveTerminalVisible True
+            )
 
         CopyReply text ->
             ( model, FileOps.copyToClipboard text )
@@ -934,7 +939,8 @@ untouched. `index.html` separately preventDefaults these combos so they don't
 insert text / transpose / reload the webview.
 
   Cmd+[ Prev · Cmd+] Next · Cmd+B Both · Cmd+E Editor · Ctrl+R Reader ·
-  Cmd+N New · Cmd+I Subjects index · Opt+R Reload · Cmd+T Terminal · Ctrl+T TOC
+  Cmd+N New · Cmd+I Subjects index · Opt+R Reload · Cmd+T Terminal · Ctrl+T TOC ·
+  Cmd+1 Shell 1 · Cmd+2 Shell 2 · Cmd+3 Scratch
 
 -}
 navKeyDecoder : D.Decoder Msg
@@ -973,6 +979,15 @@ navKeyDecoder =
 
                 else if k.ctrl && k.code == "KeyT" then
                     D.succeed ToggledToc
+
+                else if k.meta && k.code == "Digit1" then
+                    D.succeed (SelectTerminalTab "shell1")
+
+                else if k.meta && k.code == "Digit2" then
+                    D.succeed (SelectTerminalTab "shell2")
+
+                else if k.meta && k.code == "Digit3" then
+                    D.succeed (SelectTerminalTab "scratch")
 
                 else if k.alt && k.code == "KeyR" then
                     D.succeed ClickedReload
