@@ -531,7 +531,7 @@ docTitleLabel model =
             div
                 [ style "margin-left" "12px"
                 , style "color" "var(--doc-label)"
-                , style "font-size" "13px"
+                , style "font-size" "15.6px"
                 , style "white-space" "nowrap"
                 , style "overflow" "hidden"
                 , style "text-overflow" "ellipsis"
