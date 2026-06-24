@@ -60,6 +60,14 @@ pub fn terminal_open(
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
     let mut cmd = CommandBuilder::new(shell);
+    // Start a LOGIN shell (-l), as Terminal.app and VS Code do. A non-login
+    // shell skips the macOS login init (path_helper, ~/.zprofile, plugin
+    // managers, compinit). That left the interactive line editor (ZLE) and
+    // completion half-initialized: at a raw prompt you'd see "command not found:
+    // compdef" and garbled input echo (typing "ls" rendered as "lslssll…").
+    // Shell 1 hid this because it runs the agent immediately and never shows the
+    // bare prompt; Shell 2 has no init command, so it surfaced the broken state.
+    cmd.arg("-l");
     cmd.cwd(resolve_cwd(&cwd));
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
