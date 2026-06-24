@@ -242,11 +242,11 @@
           const term = new Terminal({ convertEol: false, fontFamily: 'ui-monospace, monospace', fontSize: 13, theme: { background: '#333333' } });
           const fit = new FitAddon.FitAddon();
           term.loadAddon(fit);
-          term.open(this);
           this._term = term;
           this._fit = fit;
           this._id = id;
           this._cwd = cwd;
+          this._domOpened = false;
           this._opened = false;
           this._exited = false;
           this._lastOpenAt = 0;
@@ -279,6 +279,16 @@
         }
         _openOrResize() {
           if (this.offsetWidth === 0 || this.offsetHeight === 0) return;
+          if (!this._domOpened) {
+            // Attach xterm to the DOM only once the pane is visible. Opening into
+            // a display:none element makes xterm measure a zero-size character
+            // cell, so it locks in a wrong column count and the shell's line
+            // editor (ZLE) draws garbled input — typing "ls" came out "llsls".
+            // This is why Shell 2 (mounts hidden) was corrupted while Shell 1
+            // (the default visible tab) was fine.
+            this._term.open(this);
+            this._domOpened = true;
+          }
           try { this._fit.fit(); } catch (e) { return; }
           if (this._term.cols <= 0 || this._term.rows <= 0) return;
           if (!this._opened) {
