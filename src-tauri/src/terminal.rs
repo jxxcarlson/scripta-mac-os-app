@@ -60,13 +60,15 @@ pub fn terminal_open(
 
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
     let mut cmd = CommandBuilder::new(shell);
-    // Start a LOGIN shell (-l), as Terminal.app and VS Code do. A non-login
-    // shell skips the macOS login init (path_helper, ~/.zprofile, plugin
-    // managers, compinit). That left the interactive line editor (ZLE) and
-    // completion half-initialized: at a raw prompt you'd see "command not found:
-    // compdef" and garbled input echo (typing "ls" rendered as "lslssll…").
-    // Shell 1 hid this because it runs the agent immediately and never shows the
-    // bare prompt; Shell 2 has no init command, so it surfaced the broken state.
+    // Tell the shell what terminal it's driving. A GUI app launched from Finder
+    // inherits no TERM, and the pty would pass that emptiness through — so zsh's
+    // line editor couldn't position the cursor and drew garbled input (typing
+    // "a" came out "aabc", stale characters from the redraw). xterm.js emulates
+    // xterm-256color, so advertise exactly that.
+    cmd.env("TERM", "xterm-256color");
+    cmd.env("COLORTERM", "truecolor");
+    // Start a LOGIN shell (-l), as Terminal.app and VS Code do, so the macOS
+    // login init runs (path_helper, ~/.zprofile, plugin managers, compinit).
     cmd.arg("-l");
     cmd.cwd(resolve_cwd(&cwd));
 
